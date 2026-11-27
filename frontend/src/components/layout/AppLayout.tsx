@@ -23,15 +23,23 @@ const TITLES: Record<string, string> = {
   '/calendar':  'Calendario',
   '/library':   'Libreria moduli',
   '/settings':  'Impostazioni',
-  '/invoices':  'Fatture & Pagamenti',
-  '/documents': 'Document Studio (Word & Contratti)',
+  '/invoices':  'Fatture & SDI',
+  '/documents': 'Document Studio',
   '/modelli':   'Cartella Modelli dello Studio',
   '/archivio':  'Archivio Documentale',
-  '/audit':     'Log Audit Studio',
-  '/timesheet': 'Timesheet Settimanale Ore',
+  '/audit':     'Log Audit',
+  '/timesheet': 'Timesheet ore',
   // Senza questa riga la barra in alto direbbe «BluMan», cioè il nome dell'app al posto del nome
   // della pagina.
   '/aiuto':     'Aiuto',
+  // Le pagine di contabilità e le altre che mancavano: in alto compariva «BluMan».
+  '/fornitori': 'Fornitori e acquisti',
+  '/liquidazione-iva': 'Liquidazione IVA',
+  '/scadenzario': 'Scadenzario incassi',
+  '/primanota': 'Prima Nota',
+  '/banks':     'Banche e conti',
+  '/retainers': 'Contratti Retainer',
+  '/reports':   'Report',
 };
 
 const INITIAL_NOTIFICATIONS: NotificationItem[] = [];
