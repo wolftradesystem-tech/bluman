@@ -9,6 +9,7 @@
 // Copre, in fila:
 //   1. un progetto nuovo per il cliente di prova, avviato come fa il wizard (preventivo accettato)
 //      → il valore del progetto è la somma dei prezzi dei moduli, a database;
+//      → la scheda progetto dice quale modulo attende quale («In attesa di: …»);
 //   2. il compositore della fattura propone gli importi delle voci (non «importo mancante»);
 //   3. la fattura emessa compare nello Scadenzario con la sua rata;
 //   4. «Registra Incasso» chiede data e conto, e l'incasso va sul conto scelto;
@@ -35,21 +36,23 @@ test('percorso completo: progetto → fattura → incasso → Prima Nota → sal
 
   // ── 1. Progetto nuovo, avviato come fa il wizard ────────────────────────────────────────────
   const moduli: Array<{ id: string; versione: number }> = await (await request.get(`${api}/moduli`, { headers })).json();
+  // Due moduli in catena: «Corporate structuring» (mod-m02) dipende da «Analisi patrimoniale» (mod-m01).
   const analisi = moduli.find((m) => m.id === 'mod-m01');
-  expect(analisi, 'il modulo «Analisi patrimoniale» deve essere in libreria (seed)').toBeTruthy();
+  const corporate = moduli.find((m) => m.id === 'mod-m02');
+  expect(analisi && corporate, 'i moduli mod-m01 e mod-m02 devono essere in libreria (seed)').toBeTruthy();
 
   const nomeProgetto = `Percorso completo ${Math.random().toString(36).slice(2, 8)}`;
   const progetto = await (await request.post(`${api}/progetti`, { headers, data: { clienteId: AMBIENTE_E2E.clienteBelfort.id, nome: nomeProgetto } })).json();
   const preventivo = await (await request.post(`${api}/preventivi`, {
     headers,
-    data: { clienteId: AMBIENTE_E2E.clienteBelfort.id, progettoId: progetto.id, righe: [{ moduloTemplateId: analisi!.id, moduloTemplateVersione: analisi!.versione }] },
+    data: { clienteId: AMBIENTE_E2E.clienteBelfort.id, progettoId: progetto.id, righe: [corporate!, analisi!].map((m) => ({ moduloTemplateId: m.id, moduloTemplateVersione: m.versione })) },
   })).json();
   const accettazione = await request.post(`${api}/preventivi/${preventivo.id}/accetta`, { headers });
   expect(accettazione.ok(), await accettazione.text()).toBeTruthy();
 
   const dettaglio = await (await request.get(`${api}/progetti/${progetto.id}`, { headers })).json();
   const sommaModuli = dettaglio.moduli.reduce((tot: number, m: { prezzo: number }) => tot + m.prezzo, 0);
-  expect(sommaModuli, 'il modulo di prova deve avere un prezzo').toBeGreaterThan(0);
+  expect(sommaModuli, 'i moduli di prova devono avere un prezzo').toBeGreaterThan(0);
   // Prima restava 0: elenco e Dashboard mostravano un progetto senza valore.
   expect(dettaglio.valoreTotale).toBe(sommaModuli);
 
@@ -61,6 +64,9 @@ test('percorso completo: progetto → fattura → incasso → Prima Nota → sal
   await expect(page).not.toHaveURL(/\/login/);
 
   await page.goto(`/projects/${progetto.id}`);
+  // Le dipendenze si leggono: prima «attesa dipendenza» non diceva da quale modulo.
+  const nomeAnalisi = dettaglio.moduli.find((m: { moduloTemplateId: string }) => m.moduloTemplateId === 'mod-m01').nome;
+  await expect(page.getByText(`In attesa di: «${nomeAnalisi}»`)).toBeVisible();
   await page.getByRole('button', { name: '💶 Fatturazione & SDI' }).click();
   await page.getByRole('button', { name: '✨ Componi Fattura da Microvoci & Moduli' }).click();
 
