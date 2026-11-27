@@ -20,6 +20,8 @@ La **Coda KYC / AML** (`/compliance`) raccoglie in un'unica vista le pratiche di
 
 ## ⚠️ Stati limite & errori
 - **Modulo non attivo**: la pagina indica di attivarlo da Impostazioni → Moduli.
+- **Coda non letta**: se la lettura dal server non riesce, la pagina lo dice e propone **Riprova**. Non mostra «nessuna pratica in coda» né il pannello di approvazione: un errore di lettura non vuol dire che non ci siano pratiche in attesa.
+- **Nessuna pratica in coda**: compare solo quando la coda è stata letta ed è davvero vuota.
 - **Profilo regolatorio mancante**: nessuna pratica si può approvare finché non viene impostato in Impostazioni → Compliance & AML.
 - **Pratiche respinte durante l'approvazione**: un riquadro elenca ciascun cliente con il motivo; le altre vengono approvate normalmente.
 

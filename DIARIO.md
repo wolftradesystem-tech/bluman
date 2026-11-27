@@ -23,6 +23,7 @@ README.md e `docs/storico/`.
 ## 2026-11-27
 - Giro di correzioni dopo l'analisi del 26/11 (Fabio: «vai così»): si corregge tutto ciò che non chiede una regola di business nuova; blocchi, storni, IVA trimestrale e fatturazione fuori Italia aspettano il titolare. Numerazione E/F/G/M del rapporto `BluMan_Analisi_26-11-2026.pdf`.
 - E1 — Document Studio parte dal livello di firma del modello con cui si apre, e un documento salvato riparte dal suo: prima il livello si ereditava solo scegliendo il modello dalla barra laterale, quindi un modello FEA aperto dalla Cartella Modelli si salvava come firma semplice. Nessuna regola nuova: il livello resta modificabile dall'operatore (se imporre un minimo è la domanda D11 per il titolare).
+- E3 — la Coda KYC legge prima i moduli dello studio e poi la coda, e una coda non letta è un errore con «Riprova»: a modulo spento il server risponde 403 alla coda, e letta insieme ai moduli quella risposta faceva comparire «nessuna pratica in coda: tutte gestite» con il pannello di approvazione sotto.
 
 ## 2026-11-18
 - Fornitori, fatture d'acquisto e liquidazione IVA seguono la chiave `invoices` anche via API (Fabio: «sistema tutto», proposta di Claude): l'app le nascondeva già a chi non ha Fatture, ma le rotte erano fuori matrice e senza controllo di ruolo. Nessuna voce nuova in matrice; le giurisdizioni restano leggibili da tutti e si scrivono con `library = write`.
