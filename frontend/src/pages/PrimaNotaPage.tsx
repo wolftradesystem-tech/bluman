@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motivoMovimentoNonEliminabile } from '../../../src/domain/eliminazioneMovimento';
 import {
   fetchPrimaNotaApi,
   createPrimaNotaApi,
@@ -340,6 +341,7 @@ export function PrimaNotaPage() {
                   // Senza conto si dichiara: «Cassa / Predefinito» faceva credere che il denaro fosse
                   // entrato in un conto, mentre il movimento non tocca nessun saldo di Banche & Conti.
                   const contoNome: string | null = m.contoBancario?.nomeConto || null;
+                  const motivoBlocco = motivoMovimentoNonEliminabile(m);
 
                   return (
                     <tr key={m.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -387,19 +389,27 @@ export function PrimaNotaPage() {
                         {isEntrata ? '+' : '-'} {fmt((m.importoCentesimi || 0) / 100)}
                       </td>
                       <td style={{ padding: '14px 8px', textAlign: 'center' }}>
-                        <button
-                          onClick={() => handleDeleteMovimento(m.id)}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            color: 'var(--red)',
-                            fontSize: 14,
-                          }}
-                          title="Elimina movimento"
-                        >
-                          🗑️
-                        </button>
+                        {motivoBlocco ? (
+                          // L'incasso di una fattura non si elimina da qui (lo rifiuta anche il server).
+                          <span role="img" aria-label="Movimento non eliminabile" title={motivoBlocco} style={{ cursor: 'help', fontSize: 14 }}>
+                            🔒
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleDeleteMovimento(m.id)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--red)',
+                              fontSize: 14,
+                            }}
+                            title="Elimina movimento"
+                            aria-label="Elimina movimento"
+                          >
+                            🗑️
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
