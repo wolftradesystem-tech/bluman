@@ -49,6 +49,11 @@ export function Sidebar({ alertCount = 0, user, onLogout, onOpenProfile }: Sideb
   const tenantLogo = localStorage.getItem(getTenantStorageKey('bluman_logo_url'));
   const effectiveLogo = tenantLogo || '';
 
+  const nomeStudio = studioInfo.nomeBreve || ANAGRAFICA_DA_COMPLETARE;
+  const rigaSottoLogo = effectiveLogo
+    ? (studioInfo.nomeBreve || studioInfo.ragioneSociale || ANAGRAFICA_DA_COMPLETARE)
+    : (studioInfo.ragioneSociale && studioInfo.ragioneSociale !== nomeStudio ? studioInfo.ragioneSociale : '');
+
   const userName = user?.nome || user?.name || studioInfo.leadAdvisor || 'Operatore Studio';
   const initials = userName.substring(0, 2).toUpperCase();
 
@@ -101,9 +106,13 @@ export function Sidebar({ alertCount = 0, user, onLogout, onOpenProfile }: Sideb
             </div>
           </div>
         )}
-        <div style={{ marginTop: 6, fontSize: 11, fontWeight: 600, color: 'var(--cat-societario)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          🏛 {studioInfo.nomeBreve || studioInfo.ragioneSociale || ANAGRAFICA_DA_COMPLETARE}
-        </div>
+        {/* Sotto il logo il nome dello studio. Senza logo il nome è già scritto qui sopra: si
+            aggiunge la ragione sociale solo se dice qualcosa in più (prima: «Bluecode  Bluecode»). */}
+        {rigaSottoLogo && (
+          <div style={{ marginTop: 6, fontSize: 11, fontWeight: 600, color: 'var(--cat-societario)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={rigaSottoLogo}>
+            {rigaSottoLogo}
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
