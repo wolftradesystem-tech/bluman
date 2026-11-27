@@ -70,7 +70,7 @@ export function Dashboard() {
             start: rp.dataInizio
               ? new Date(rp.dataInizio).toLocaleDateString('it-IT')
               : rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'n/d',
-            due: rp.dataScadenza ? new Date(rp.dataScadenza).toLocaleDateString('it-IT') : 'n/d',
+            due: rp.dataScadenza ? new Date(rp.dataScadenza).toLocaleDateString('it-IT') : '',
             // Regola 7: il valore arriva dal DB (centesimi); se manca o è zero il progetto
             // non contribuisce al portafoglio — mai inventare una cifra verosimile.
             val: rp.valoreTotale != null ? rp.valoreTotale / 100 : 0,
@@ -360,7 +360,7 @@ export function Dashboard() {
                       >
                         {p.ct === 'individual' ? '👤' : '🏢'} {p.cl}
                       </span>
-                      <span>📅 {p.start} → {p.due}</span>
+                      <span title={p.due ? 'Data di avvio → scadenza' : 'Data di avvio (nessuna scadenza indicata)'}>📅 {p.start}{p.due ? ` → ${p.due}` : ''}</span>
                       {/* Regola 7: il valore si mostra solo se il progetto lo porta davvero;
                           mai esporre una cifra per un progetto senza valore registrato. */}
                       {p.val > 0 && <span>💶 {fmt(p.val)}</span>}
