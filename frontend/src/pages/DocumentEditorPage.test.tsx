@@ -2,7 +2,7 @@
 // valore diventava «€ 8.500,00» (o «€ 0,00»), e senza anagrafica dal server la pagina ripiegava
 // sui dati dello studio dimostrativo (getStudioInfoForTenant). Ora il dato mancante è un
 // segnaposto evidente, come in resolveDocumentTemplateHtml.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -44,6 +44,16 @@ function apri() {
     </MemoryRouter>,
   );
 }
+
+// Il primo mount del file paga il riscaldamento di React e jsdom (~430 ms contro ~160 ms dei
+// successivi): sotto il carico delle prove in parallelo bastava a portare il primo test oltre i 5 s
+// (run 46016198424). Lo si paga qui, una volta, fuori dai test.
+beforeAll(() => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+  vi.mocked(fetchProgetti).mockResolvedValue([]);
+  vi.mocked(fetchTenantInfoApi).mockResolvedValue(null);
+  apri().unmount();
+});
 
 beforeEach(() => {
   localStorage.clear();
