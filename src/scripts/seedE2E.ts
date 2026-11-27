@@ -123,8 +123,9 @@ async function main(): Promise<void> {
         tenantId: E2E_TENANT_ID,
         nomeConto: CONTO_DI_PROVA,
         banca: 'Banca di prova',
-        saldoIniziale: 0,
-        saldoAttuale: 0,
+        // I saldi non si scrivono qui: partono da 0 per schema, e la colonna del saldo ha un
+        // solo posto che la scrive (`services/primaNotaMovimento.ts`, presidio in
+        // `primaNotaSaldoCoerenza.test.ts`).
         isDefault: haPredefinito === 0,
       },
     });
