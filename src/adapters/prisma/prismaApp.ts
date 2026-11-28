@@ -356,6 +356,8 @@ export class PrismaApp implements AppPort {
                 // Condivisioni USCENTI: in quali altri moduli questa voce è condivisa (per il
                 // pannello «voci condivise» del modulo proprietario).
                 condivisioni: { select: { moduloProgettoId: true } },
+                // Il listino dell'articolo (versione congelata): da qui l'importo proposto in fattura.
+                articolo: { select: { prezzoDefault: true } },
               },
             },
             // Da quali moduli dipende questo modulo: serve alla scheda progetto per dire DA COSA

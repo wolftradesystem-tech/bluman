@@ -34,6 +34,7 @@ import { CreaProgettoSchema, ConsuntivaOreSchema, NuovaComunicazioneSchema } fro
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 import { leggiIntervalloData } from '../util/intervalloData.js';
 import { conStatoComunicazione, leggiMetaComunicazione, proiettaRecapito } from '../util/statoComunicazione.js';
+import { conImportiProposti, senzaListino } from '../domain/importiFatturabili.js';
 import {
   abbinaAlContesto,
   abbinaManuale,
@@ -584,8 +585,11 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       if (!clienteId || dbProj.clienteId !== clienteId) {
         return reply.code(404).send({ errore: `Progetto ${id} non trovato` });
       }
+      // Al cliente non vanno né il listino degli articoli né gli importi proposti in fattura.
+      return reply.send({ ...senzaListino(dbProj), avanzamento: calcolaAvanzamento(dbProj) });
     }
-    return reply.send({ ...dbProj, avanzamento: calcolaAvanzamento(dbProj) });
+    // Gli importi proposti in fattura (listino, sconto) li calcola il server: la pagina li legge.
+    return reply.send({ ...conImportiProposti(dbProj), avanzamento: calcolaAvanzamento(dbProj) });
   });
 
   // §1.1 (docs/storico/PIANO_DI_MIGLIORAMENTO.md) — l'eliminazione transazionale esisteva già
