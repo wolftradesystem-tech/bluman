@@ -118,7 +118,7 @@ export function ModuloCasellaPosta({ clienti, onCollegata, onAnnulla }: Props) {
         <label style={etichetta}>Nome <span style={nota}>come la riconosci nell’elenco</span>
           <input value={dati.nome} onChange={imposta('nome')} required maxLength={80} style={campo} />
         </label>
-        <label style={etichetta}>Indirizzo della casella
+        <label style={etichetta}>Indirizzo della casella <span style={nota}>quello a cui arriva la posta</span>
           <input type="email" value={dati.indirizzo} onChange={imposta('indirizzo')} required maxLength={254} style={campo} />
         </label>
         <label style={etichetta}>Server IMAP <span style={nota}>per esempio imap.gmail.com</span>
