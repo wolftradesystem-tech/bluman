@@ -23,7 +23,7 @@ fattura a cadenza fissa (mensile, trimestrale, annuale).
 
 ## ⚠️ Stati limite & errori
 - Contratto senza cliente/importo → non creabile.
-- La generazione fattura segue le stesse guardie del registro (numerazione, IVA).
+- La generazione fattura segue le stesse guardie del registro (numerazione, IVA), compreso il blocco se al cliente mancano i dati fiscali (§05).
 
 ## 🔧 Nota tecnica
 - Rotte: `src/routes/contabilitaContratti.ts` — `GET /contratti-ricorrenti`, `POST /contratti-ricorrenti`,

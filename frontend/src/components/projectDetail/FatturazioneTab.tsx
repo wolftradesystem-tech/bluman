@@ -8,6 +8,7 @@ import { getTenantStorageKey, getStudioInfoForTenant, getCurrentTenantId, BLUECO
 import type { Progetto } from '../../types';
 import styles from '../../pages/ProjectDetail.module.css';
 import { useToast } from '../ui/ToastProvider';
+import { useDatiClienteMancanti } from '../contabilita/DatiClienteMancanti';
 import { Modal } from '../ui/Modal';
 
 export interface VoceFatturabile {
@@ -46,6 +47,7 @@ function quotaModulo(m: unknown, numVoci: number): number | null {
 // ─── Fatturazione Tab ─────────────────────────────────────────────
 export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Progetto; rawDbProject?: any; onRefresh: () => void }) {
   const toast = useToast();
+  const datiCliente = useDatiClienteMancanti();
   const navigate = useNavigate();
   const totFatturato = project.fatture.reduce((a, f) => a + f.importo, 0);
   const residuo = project.val - totFatturato;
@@ -225,6 +227,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
       onRefresh();
       toast.successo(`Documento ${resFattura?.numero || 'fiscale'} emesso con successo a database (${righe.length} voci fatturate per ${fmt(totaleImponibile)})!`);
     } catch (err: any) {
+      if (datiCliente.intercetta(err)) return;
       console.error(err);
       toast.errore(`Errore emissione fattura: ${err?.message || 'Impossibile completare la richiesta'}`);
     } finally {
@@ -814,6 +817,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
           )}
         </Modal>
       )}
+      {datiCliente.modale}
     </div>
   );
 }

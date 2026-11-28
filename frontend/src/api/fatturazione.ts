@@ -1,4 +1,5 @@
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
+import { erroreEmissione } from './erroriEmissione';
 import { toast } from '../components/ui/ToastProvider';
 import { queryPaginazione, type ParametriListaPaginata } from './paginazione';
 import { cachedQuery, invalidateCache } from './cache';
@@ -28,6 +29,8 @@ export async function fatturePortaleApi(clienteId?: string): Promise<FatturaPort
   return data.fatture ?? [];
 }
 
+export { ErroreDatiClienteMancanti } from './erroriEmissione';
+
 export async function emettiFatturaApi(input: {
   progettoId: string;
   tipoClienteFiscale: 'privato_italia' | 'business_italia' | 'estero';
@@ -47,10 +50,7 @@ export async function emettiFatturaApi(input: {
     headers: getAuthHeaders(),
     body: JSON.stringify(input),
   });
-  if (!res.ok) {
-    const msg = await leggiErroreApi(res, 'Errore emissione fattura');
-    throw new Error(msg);
-  }
+  if (!res.ok) throw await erroreEmissione(res, 'Errore emissione fattura');
   invalidateCache('fattur');
   invalidateCache('scadenz');
   invalidateCache('progett');
@@ -194,7 +194,7 @@ export async function generaFatturaRetainerApi(contrattoId: string) {
     method: 'POST',
     headers: getAuthHeaders(),
   });
-  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore generazione fattura retainer'));
+  if (!res.ok) throw await erroreEmissione(res, 'Errore generazione fattura retainer');
   invalidateCache('contratti_ricorrenti');
   invalidateCache('fattur');
   return await res.json();
@@ -336,7 +336,7 @@ export async function emettiInvoiceApi(id: string) {
     method: 'POST',
     headers: getAuthHeaders(),
   });
-  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore emissione fattura'));
+  if (!res.ok) throw await erroreEmissione(res, 'Errore emissione fattura');
   invalidateCache('fattur');
   invalidateCache('scadenz');
   return await res.json();

@@ -20,6 +20,7 @@ import { fmt } from '../utils';
 import { calcolaTotaliAnteprimaFattura } from '../utils/fatturazione';
 import { EsportaFascicoloCommercialistaModal } from '../components/contabilita/EsportaFascicoloCommercialistaModal';
 import { RegistraIncassoModal } from '../components/contabilita/RegistraIncassoModal';
+import { useDatiClienteMancanti } from '../components/contabilita/DatiClienteMancanti';
 import { Paginatore } from '../components/ui/Paginatore';
 import { FiltroPeriodo } from '../components/ui/FiltroPeriodo';
 import { usePeriodo } from '../context/PeriodoContext';
@@ -39,6 +40,7 @@ const RIEPILOGO_INIZIALE: RiepilogoFatture = { totaleEmessoCentesimi: 0, totaleI
 
 export function InvoicesPage() {
   const toast = useToast();
+  const datiCliente = useDatiClienteMancanti();
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [clienti, setClienti] = useState<any[]>([]);
@@ -255,6 +257,8 @@ export function InvoicesPage() {
       await loadData();
       toast.successo(emettiSubito ? 'Fattura emessa definitivamente con successo!' : 'Bozza salvata con successo nel registro!');
     } catch (err: any) {
+      // La bozza è stata salvata, l'emissione no: si chiude il modulo e la bozza resta nel registro.
+      if (datiCliente.intercetta(err)) { setShowCreateModal(false); await loadData(); return; }
       toast.errore(`Errore salvataggio fattura: ${err.message}`);
     } finally {
       setSubmitting(false);
@@ -268,6 +272,7 @@ export function InvoicesPage() {
       await loadData();
       toast.successo('Fattura emessa con successo!');
     } catch (err: any) {
+      if (datiCliente.intercetta(err)) return;
       toast.errore(`Errore: ${err.message}`);
     }
   };
@@ -1079,6 +1084,7 @@ export function InvoicesPage() {
         isOpen={showExportFascicoloZipModal}
         onClose={() => setShowExportFascicoloZipModal(false)}
       />
+      {datiCliente.modale}
     </div>
   );
 }
