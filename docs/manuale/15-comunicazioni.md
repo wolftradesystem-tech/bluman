@@ -112,14 +112,16 @@ cancella. Per il cliente la sua posta resta com'era.
   solo quando un cliente scrive e non riceve risposta.
 - **Cifratura del canale protetto.** È cifratura **a riposo**: nel database e nell'archivio dei file
   il messaggio e l'allegato sono testo cifrato (AES-256-GCM), con una chiave derivata per ogni studio
-  dalla variabile `CANALE_PROTETTO_CHIAVE` del server. Chi mette le mani su una copia del database o
-  su un backup non legge la corrispondenza; un messaggio spostato a mano su un altro studio o su
-  un'altra pratica non si apre. **Non è cifratura «da capo a capo»**: il server decifra per chi ha
-  titolo a leggere, perché lo studio deve poter consultare e conservare la corrispondenza della
-  pratica e il cliente entra con un link, senza una chiave sua.
-- **Senza la variabile il canale funziona in chiaro, e lo dice**: il portale mostra «Canale
-  riservato, non ancora cifrato» e nessun lucchetto. Con una variabile presente ma non valida (meno
-  di 32 caratteri) il canale **rifiuta di scrivere** invece di salvare in chiaro.
+  da un segreto del server. Chi mette le mani su una copia del database o su un backup non legge la
+  corrispondenza; un messaggio spostato a mano su un altro studio o su un'altra pratica non si apre.
+  **Non è cifratura «da capo a capo»**: il server decifra per chi ha titolo a leggere, perché lo
+  studio deve poter consultare e conservare la corrispondenza della pratica e il cliente entra con
+  un link, senza una chiave sua.
+- **La chiave** si ricava da `JWT_SECRET`, che in produzione c'è sempre: il canale è cifrato senza
+  niente da impostare. `CANALE_PROTETTO_CHIAVE`, se presente, la sostituisce; se è presente ma non
+  valida (meno di 32 caratteri) il canale **rifiuta di scrivere** invece di ripiegare. Solo senza
+  nessuna delle due (sviluppo) il canale funziona in chiaro, e il portale lo dice: «Canale
+  riservato, non ancora cifrato», senza lucchetto.
 - **Sul portale il cliente scrive solo nel canale protetto**: il canale non lo sceglie lui, e gli
   allegati che dichiara a mano si ignorano. I messaggi scritti prima dell'attivazione restano
   leggibili e non vengono cifrati a posteriori.
@@ -168,9 +170,10 @@ arriva al giro successivo. Di ogni messaggio salva fino a 20 allegati, ciascuno 
 
 ## ⚠️ Stati limite & errori
 - Relay non configurato → invio email non parte (fail-closed).
-- Chiave del canale protetto non valida → il messaggio non parte (**503**) e lo dice; chiave cambiata
-  senza tenere la vecchia in `CANALE_PROTETTO_CHIAVI_PRECEDENTI` → i messaggi vecchi compaiono come
-  «non leggibile su questo server» (non spariscono) e l'allegato risponde **409**.
+- Chiave del canale protetto non valida → il messaggio non parte (**503**) e lo dice. Segreto
+  cambiato senza tenere il vecchio in `CANALE_PROTETTO_CHIAVI_PRECEDENTI` → i messaggi scritti prima
+  compaiono come «non leggibile su questo server» (non spariscono: tornano quando il vecchio
+  segreto è di nuovo in elenco) e l'allegato risponde **409**.
 - Allegato del canale protetto oltre 15 MB, più di 5 per messaggio, o di un tipo non ammesso →
   rifiutato con il motivo (**400**), e il testo scritto resta nel compositore del portale.
 - Bot Telegram con username errato / id numerico → messaggi guidati diversi per rimedi diversi.

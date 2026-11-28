@@ -147,11 +147,18 @@ describe('GET /portal/riepilogo', () => {
     await server.close();
   });
 
-  it('senza chiave dichiara che il canale non è cifrato', async () => {
+  it('senza nessuna chiave dichiara che il canale non è cifrato', async () => {
+    // Senza chiave dedicata vale il segreto dei token: «in chiaro» è solo senza entrambi.
+    const segretoToken = process.env.JWT_SECRET;
     delete process.env.CANALE_PROTETTO_CHIAVE;
-    const server = await serverPer('cliente', 'client-cli-1');
-    expect((await server.inject({ method: 'GET', url: '/portal/riepilogo' })).json().canaleProtetto).toEqual({ cifraturaAttiva: false, disponibile: true });
-    await server.close();
+    delete process.env.JWT_SECRET;
+    try {
+      const server = await serverPer('cliente', 'client-cli-1');
+      expect((await server.inject({ method: 'GET', url: '/portal/riepilogo' })).json().canaleProtetto).toEqual({ cifraturaAttiva: false, disponibile: true });
+      await server.close();
+    } finally {
+      if (segretoToken !== undefined) process.env.JWT_SECRET = segretoToken;
+    }
   });
 
   it('un cliente non può chiedere il riepilogo di un altro passando il suo id', async () => {

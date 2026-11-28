@@ -7,19 +7,30 @@
 // Comunicazioni): lo studio deve poter leggere, cercare e conservare la corrispondenza della
 // pratica, e il cliente entra con un link, senza una chiave sua da custodire.
 //
-// La chiave non sta nel codice né nel database: è la variabile d'ambiente `CANALE_PROTETTO_CHIAVE`.
-// Da lei si deriva una chiave per studio (HKDF-SHA256 col tenant come sale): il testo cifrato di
-// uno studio non si apre con la chiave di un altro. AES-256-GCM, con studio e ambito legati al
-// testo cifrato (dati autenticati): un messaggio spostato a mano su un'altra pratica non si apre.
+// La chiave non sta nel codice né nel database: viene dall'ambiente. Se c'è la variabile dedicata
+// `CANALE_PROTETTO_CHIAVE` si usa quella; altrimenti si usa `JWT_SECRET`, che in produzione è
+// obbligatorio: così il canale è cifrato dal primo giorno, senza un segreto in più da impostare a
+// mano (la stessa scelta di `util/cifraturaSegreti.ts`). Dal segreto si deriva una chiave per studio
+// (HKDF-SHA256 col tenant come sale e un'etichetta propria: non è la chiave che firma i token): il
+// testo cifrato di uno studio non si apre con la chiave di un altro. AES-256-GCM, con studio e
+// ambito legati al testo cifrato (dati autenticati): un messaggio spostato a mano su un'altra
+// pratica non si apre.
 //
-// Senza la variabile il canale funziona come prima, in chiaro, e `statoCifratura()` lo dice:
-// l'interfaccia non mostra un lucchetto che non c'è. Con una variabile presente ma non valida la
-// scrittura si rifiuta: chi l'ha impostata voleva la cifratura, e salvare in chiaro in silenzio
-// sarebbe il contrario di ciò che ha chiesto.
+// La corrispondenza vive anni, i token un giorno: quando `JWT_SECRET` cambia, quello vecchio va
+// tenuto in `CANALE_PROTETTO_CHIAVI_PRECEDENTI` (non solo in `JWT_PREVIOUS_SECRETS`, che dopo un
+// giorno si svuota), altrimenti i messaggi scritti prima risultano «non leggibili su questo server»
+// finché non ci torna. Ogni dato cifrato porta l'impronta della chiave che lo apre.
+//
+// Senza nessuna delle due (sviluppo) il canale funziona in chiaro e `statoCifratura()` lo dice:
+// l'interfaccia non mostra un lucchetto che non c'è. Con una `CANALE_PROTETTO_CHIAVE` presente ma
+// non valida la scrittura si rifiuta: chi l'ha impostata voleva quella chiave, e ripiegare in
+// silenzio su un'altra o sul testo in chiaro sarebbe il contrario di ciò che ha chiesto.
 import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from 'node:crypto';
 
 const VARIABILE_CHIAVE = 'CANALE_PROTETTO_CHIAVE';
 const VARIABILE_PRECEDENTI = 'CANALE_PROTETTO_CHIAVI_PRECEDENTI';
+const VARIABILE_JWT = 'JWT_SECRET';
+const VARIABILE_JWT_PRECEDENTI = 'JWT_PREVIOUS_SECRETS';
 const LUNGHEZZA_MINIMA_CHIAVE = 32;
 const INFO_DERIVAZIONE = 'bluman/canale-protetto/v1';
 
@@ -51,7 +62,8 @@ interface Portachiavi {
 
 function chiaveDa(valore: string): ChiaveMaestra {
   const materiale = Buffer.from(valore, 'utf8');
-  return { id: createHash('sha256').update(materiale).digest('hex').slice(0, 8), materiale };
+  // L'impronta passa da un'etichetta: non è un pezzo dell'hash del segreto così com'è.
+  return { id: createHash('sha256').update('bluman/canale-protetto/impronta:').update(materiale).digest('hex').slice(0, 8), materiale };
 }
 
 // Le variabili si leggono a ogni uso (costa un confronto di stringhe): così una prova può
@@ -59,31 +71,44 @@ function chiaveDa(valore: string): ChiaveMaestra {
 let memoria: { firma: string; portachiavi: Portachiavi } | null = null;
 const chiaviDerivate = new Map<string, Buffer>();
 
-function portachiavi(): Portachiavi {
-  const grezza = (process.env[VARIABILE_CHIAVE] ?? '').trim();
-  const precedentiGrezze = (process.env[VARIABILE_PRECEDENTI] ?? '').trim();
-  const firma = `${grezza}\n${precedentiGrezze}`;
-  if (memoria?.firma === firma) return memoria.portachiavi;
-
-  const precedenti = precedentiGrezze
+function elencoChiavi(grezze: string): ChiaveMaestra[] {
+  return grezze
     .split(',')
     .map((v) => v.trim())
     .filter((v) => v.length >= LUNGHEZZA_MINIMA_CHIAVE)
     .map(chiaveDa);
+}
+
+function senzaDoppioni(chiavi: ChiaveMaestra[]): ChiaveMaestra[] {
+  return chiavi.filter((chiave, indice) => chiavi.findIndex((altra) => altra.id === chiave.id) === indice);
+}
+
+function portachiavi(): Portachiavi {
+  const grezza = (process.env[VARIABILE_CHIAVE] ?? '').trim();
+  const precedentiGrezze = (process.env[VARIABILE_PRECEDENTI] ?? '').trim();
+  const jwt = (process.env[VARIABILE_JWT] ?? '').trim();
+  const jwtPrecedenti = (process.env[VARIABILE_JWT_PRECEDENTI] ?? '').trim();
+  const firma = [grezza, precedentiGrezze, jwt, jwtPrecedenti].join('\n');
+  if (memoria?.firma === firma) return memoria.portachiavi;
+
+  // Per rileggere valgono tutte: le precedenti dichiarate, e i segreti dei token di adesso e di
+  // prima, perché finché non c'è una chiave dedicata è con quelli che si è scritto.
+  const perRileggere = [...elencoChiavi(precedentiGrezze), ...elencoChiavi(jwt), ...elencoChiavi(jwtPrecedenti)];
 
   let nuovo: Portachiavi;
   if (!grezza) {
-    // Le chiavi precedenti restano utili anche senza una corrente: servono a rileggere.
-    nuovo = { corrente: null, tutte: precedenti, errore: null };
+    // Un `JWT_SECRET` corto (ammesso solo fuori produzione) non fa da chiave: si resta in chiaro.
+    const corrente = elencoChiavi(jwt)[0] ?? null;
+    nuovo = { corrente, tutte: senzaDoppioni(corrente ? [corrente, ...perRileggere] : perRileggere), errore: null };
   } else if (grezza.length < LUNGHEZZA_MINIMA_CHIAVE) {
     nuovo = {
       corrente: null,
-      tutte: precedenti,
+      tutte: senzaDoppioni(perRileggere),
       errore: `${VARIABILE_CHIAVE} è più corta di ${LUNGHEZZA_MINIMA_CHIAVE} caratteri: il canale protetto non accetta messaggi finché non è corretta.`,
     };
   } else {
     const corrente = chiaveDa(grezza);
-    nuovo = { corrente, tutte: [corrente, ...precedenti.filter((p) => p.id !== corrente.id)], errore: null };
+    nuovo = { corrente, tutte: senzaDoppioni([corrente, ...perRileggere]), errore: null };
   }
   memoria = { firma, portachiavi: nuovo };
   chiaviDerivate.clear();
@@ -152,8 +177,8 @@ function chiavePerLeggere(id: string): ChiaveMaestra {
 }
 
 /**
- * Cifra un testo per lo studio e l'ambito indicati (per i messaggi: la pratica). Senza chiave
- * configurata restituisce il testo com'è.
+ * Cifra un testo per lo studio e l'ambito indicati (per i messaggi: la pratica). Senza nessuna
+ * chiave nell'ambiente restituisce il testo com'è.
  */
 export function cifraTesto(tenantId: string, ambito: string, chiaro: string): string {
   const maestra = chiavePerScrivere();

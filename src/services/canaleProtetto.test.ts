@@ -33,6 +33,12 @@ const STUDIO = '00000000-0000-0000-0000-000000000001';
 const PDF = Buffer.from('%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\nvisura riservata del cliente\n%%EOF');
 const base64 = (b: Buffer) => b.toString('base64');
 const prima = process.env.CANALE_PROTETTO_CHIAVE;
+// Senza chiave dedicata il canale usa il segreto dei token: «senza chiave» vuol dire senza entrambi.
+const segretoToken = process.env.JWT_SECRET;
+function senzaNessunaChiave() {
+  delete process.env.CANALE_PROTETTO_CHIAVE;
+  delete process.env.JWT_SECRET;
+}
 
 function riga(contenuto: { testo: string; allegatiJson: string | null }, progettoId = 'p-1') {
   return { id: 'msg-1', tenantId: STUDIO, progettoId, canale: 'portal', ...contenuto };
@@ -46,6 +52,7 @@ beforeEach(() => {
 afterEach(() => {
   if (prima === undefined) delete process.env.CANALE_PROTETTO_CHIAVE;
   else process.env.CANALE_PROTETTO_CHIAVE = prima;
+  if (segretoToken !== undefined) process.env.JWT_SECRET = segretoToken;
 });
 
 describe('messaggio', () => {
@@ -97,10 +104,17 @@ describe('messaggio', () => {
   });
 
   it('senza chiave scrive in chiaro e non dichiara un lucchetto che non c’è', () => {
-    delete process.env.CANALE_PROTETTO_CHIAVE;
+    senzaNessunaChiave();
     const scritto = contenutoDaScrivere(STUDIO, 'p-1', { testo: 'in chiaro' });
     expect(scritto.testo).toBe('in chiaro');
     expect(messaggioLeggibile(riga(scritto)).cifrato).toBe(false);
+  });
+
+  it('senza chiave dedicata cifra con il segreto dei token', () => {
+    delete process.env.CANALE_PROTETTO_CHIAVE;
+    const scritto = contenutoDaScrivere(STUDIO, 'p-1', { testo: 'riservato' });
+    expect(scritto.testo).not.toContain('riservato');
+    expect(messaggioLeggibile(riga(scritto))).toMatchObject({ testo: 'riservato', cifrato: true });
   });
 
   it('con una chiave non valida rifiuta prima di lasciare file in archivio', async () => {
@@ -152,7 +166,7 @@ describe('allegati', () => {
   });
 
   it('senza chiave il file si archivia in chiaro e si rilegge', async () => {
-    delete process.env.CANALE_PROTETTO_CHIAVE;
+    senzaNessunaChiave();
     const scritto = await preparaMessaggioProtetto(STUDIO, 'p-1', {
       testo: 'x',
       allegatiProtetti: [{ nome: 'visura.pdf', contentBase64: base64(PDF) }],

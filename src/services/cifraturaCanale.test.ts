@@ -16,18 +16,22 @@ const ALTRA = 'chiave-di-prova-del-canale-protetto-0002';
 const STUDIO = '00000000-0000-0000-0000-000000000001';
 const ALTRO_STUDIO = '00000000-0000-0000-0000-000000000002';
 
-const prima = { chiave: process.env.CANALE_PROTETTO_CHIAVE, precedenti: process.env.CANALE_PROTETTO_CHIAVI_PRECEDENTI };
+const SEGRETO_TOKEN = 'segreto-dei-token-di-prova-lungo-abbastanza-01';
+const SEGRETO_TOKEN_NUOVO = 'segreto-dei-token-di-prova-lungo-abbastanza-02';
+
+const VARIABILI = ['CANALE_PROTETTO_CHIAVE', 'CANALE_PROTETTO_CHIAVI_PRECEDENTI', 'JWT_SECRET', 'JWT_PREVIOUS_SECRETS'] as const;
+const prima = Object.fromEntries(VARIABILI.map((nome) => [nome, process.env[nome]]));
 
 beforeEach(() => {
+  for (const nome of VARIABILI) delete process.env[nome];
   process.env.CANALE_PROTETTO_CHIAVE = CHIAVE;
-  delete process.env.CANALE_PROTETTO_CHIAVI_PRECEDENTI;
 });
 
 afterEach(() => {
-  if (prima.chiave === undefined) delete process.env.CANALE_PROTETTO_CHIAVE;
-  else process.env.CANALE_PROTETTO_CHIAVE = prima.chiave;
-  if (prima.precedenti === undefined) delete process.env.CANALE_PROTETTO_CHIAVI_PRECEDENTI;
-  else process.env.CANALE_PROTETTO_CHIAVI_PRECEDENTI = prima.precedenti;
+  for (const nome of VARIABILI) {
+    if (prima[nome] === undefined) delete process.env[nome];
+    else process.env[nome] = prima[nome];
+  }
 });
 
 describe('testo', () => {
@@ -86,6 +90,56 @@ describe('chiave', () => {
     // I messaggi nuovi usano la chiave nuova.
     const nuovo = cifraTesto(STUDIO, 'msg:p-1', 'nuovo');
     expect(nuovo.split('.')[1]).not.toBe(vecchio.split('.')[1]);
+  });
+});
+
+describe('senza chiave dedicata', () => {
+  beforeEach(() => {
+    delete process.env.CANALE_PROTETTO_CHIAVE;
+    process.env.JWT_SECRET = SEGRETO_TOKEN;
+  });
+
+  it('cifra con il segreto dei token: in produzione il canale è protetto dal primo giorno', () => {
+    expect(statoCifratura()).toEqual({ attiva: true, errore: null });
+    const cifrato = cifraTesto(STUDIO, 'msg:p-1', 'riservato');
+    expect(eTestoCifrato(cifrato)).toBe(true);
+    expect(decifraTesto(STUDIO, 'msg:p-1', cifrato)).toBe('riservato');
+  });
+
+  it('un segreto dei token corto non fa da chiave: resta in chiaro e lo dichiara', () => {
+    process.env.JWT_SECRET = 'corto';
+    expect(statoCifratura()).toEqual({ attiva: false, errore: null });
+    expect(cifraTesto(STUDIO, 'msg:p-1', 'in chiaro')).toBe('in chiaro');
+  });
+
+  it('quando arriva la chiave dedicata, i messaggi scritti prima si leggono ancora', () => {
+    const vecchio = cifraTesto(STUDIO, 'msg:p-1', 'scritto col segreto dei token');
+    process.env.CANALE_PROTETTO_CHIAVE = CHIAVE;
+    expect(decifraTesto(STUDIO, 'msg:p-1', vecchio)).toBe('scritto col segreto dei token');
+    expect(cifraTesto(STUDIO, 'msg:p-1', 'nuovo').split('.')[1]).not.toBe(vecchio.split('.')[1]);
+  });
+
+  it('dopo il cambio del segreto dei token si legge finché il vecchio resta fra le chiavi precedenti', () => {
+    const vecchio = cifraTesto(STUDIO, 'msg:p-1', 'scritto prima del cambio');
+
+    // Il giorno del cambio: il vecchio sta fra i segreti precedenti dei token.
+    process.env.JWT_SECRET = SEGRETO_TOKEN_NUOVO;
+    process.env.JWT_PREVIOUS_SECRETS = SEGRETO_TOKEN;
+    expect(decifraTesto(STUDIO, 'msg:p-1', vecchio)).toBe('scritto prima del cambio');
+
+    // Un giorno dopo quell'elenco si svuota: senza altro i messaggi non si aprono, e lo si dice.
+    delete process.env.JWT_PREVIOUS_SECRETS;
+    expect(() => decifraTesto(STUDIO, 'msg:p-1', vecchio)).toThrow(/non è configurata/);
+
+    // Il rimedio è tenerlo fra le chiavi precedenti del canale.
+    process.env.CANALE_PROTETTO_CHIAVI_PRECEDENTI = SEGRETO_TOKEN;
+    expect(decifraTesto(STUDIO, 'msg:p-1', vecchio)).toBe('scritto prima del cambio');
+  });
+
+  it('l’impronta scritta accanto al messaggio non è un pezzo dell’hash del segreto', async () => {
+    const { createHash } = await import('node:crypto');
+    const impronta = cifraTesto(STUDIO, 'msg:p-1', 'x').split('.')[1];
+    expect(impronta).not.toBe(createHash('sha256').update(SEGRETO_TOKEN).digest('hex').slice(0, 8));
   });
 });
 
