@@ -35,6 +35,7 @@ import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util
 import { leggiIntervalloData } from '../util/intervalloData.js';
 import { conStatoComunicazione, leggiMetaComunicazione, proiettaRecapito } from '../util/statoComunicazione.js';
 import { conImportiProposti, senzaListino } from '../domain/importiFatturabili.js';
+import { registraRottaScontoProgetto } from './progettiSconto.js';
 import {
   abbinaAlContesto,
   abbinaManuale,
@@ -63,6 +64,7 @@ async function clienteDellaPratica(tenantId: string, progettoId: string): Promis
 
 // ─── PROGETTI, COMUNICAZIONI, TIMESHEET, CHECKLIST & ESECUZIONE ─────
 export async function registraRotteProgetti(server: FastifyInstance, app: AppPort): Promise<void> {
+  await registraRottaScontoProgetto(server);
   // Comunicazioni Progetto API (Multicanale Ingestion)
   server.get<{ Params: { id: string } }>('/progetti/:id/comunicazioni', async (req, reply) => {
     if (req.ruolo === 'cliente') {

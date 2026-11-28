@@ -768,6 +768,11 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
               <div>
                 <div style={{ fontSize: 11, color: 'var(--muted)' }}>Voci selezionate: <strong>{vociSelezionate.length}</strong> su {vociFatturabili.length}</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Imponibile: {fmt(totaleImponibile)} · IVA ({aliquotaPct}%): {fmt(totaleIva)}</div>
+                {proposti.scontoEuro > 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                    Sconto di progetto {fmt(proposti.scontoEuro)}: già tolto dagli importi proposti, e dichiarato in fattura.
+                  </div>
+                )}
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 11, color: 'var(--indigo-l)', fontWeight: 600 }}>TOTALE DOCUMENTO</div>

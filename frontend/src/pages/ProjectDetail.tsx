@@ -15,6 +15,7 @@ import { StoricoContrattiTab } from '../components/projectDetail/StoricoContratt
 import { DocumentiTab } from '../components/projectDetail/DocumentiTab';
 import { CalendarioProgettoTab } from '../components/projectDetail/CalendarioProgettoTab';
 import { HeaderProgetto } from '../components/projectDetail/HeaderProgetto';
+import { ScontoProgettoModal } from '../components/projectDetail/ScontoProgettoModal';
 import { ModalAccessiProgetto } from '../components/projectDetail/ModalAccessiProgetto';
 import { fetchProgettoDettaglio, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, eliminaModuloApi, ricalcolaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
 import { useTeamMembers } from '../hooks/useTeamMembers';
@@ -333,6 +334,7 @@ export function ProjectDetail() {
   };
 
   const [rawDbProject, setRawDbProject] = useState<any>(null);
+  const [scontoAperto, setScontoAperto] = useState(false);
 
   const loadDetail = async () => {
     setLoading(true);
@@ -757,7 +759,9 @@ export function ProjectDetail() {
     // Con moduli il valore è la loro somma e lo scrive il server: un importo scritto a mano
     // veniva sovrascritto al primo salvataggio, e a schermo spariva già alla riapertura.
     if (!valoreProgettoModificabile(project.mods)) {
-      toast.attenzione(SPIEGAZIONE_VALORE_DA_MODULI);
+      // Con moduli si scrive lo sconto (titolare, 28/11/2026), non il valore: serve il progetto a database.
+      if (rawDbProject?.id) setScontoAperto(true);
+      else toast.attenzione(SPIEGAZIONE_VALORE_DA_MODULI);
       return;
     }
     const nuovoVal = prompt('Inserisci il nuovo valore totale dell\'incarico (€):', String(project.val));
@@ -896,11 +900,22 @@ export function ProjectDetail() {
         onApriCliente={() => navigate(`/clients?client=${encodeURIComponent(project.cl)}`)}
         onModificaValore={handleModificaValore}
         valoreModificabile={valoreProgettoModificabile(project.mods)}
+        scontoEuro={(rawDbProject?.scontoApplicatoCentesimi ?? 0) / 100}
         onApriAccessi={() => setAccessiModalOpen(true)}
         onRicalcola={handleRicalcolaAvanzamento}
         onArchivia={handleArchiviaRipristina}
         onElimina={() => setDeleteModalOpen(true)}
       />
+
+      {scontoAperto && rawDbProject?.id && (
+        <ScontoProgettoModal
+          progettoId={rawDbProject.id}
+          sommaModuliCentesimi={rawDbProject.sommaModuliCentesimi ?? 0}
+          scontoCentesimi={rawDbProject.scontoCentesimi ?? 0}
+          onClose={() => setScontoAperto(false)}
+          onSalvato={loadDetail}
+        />
+      )}
 
       {/* Tabs */}
       <div className={styles.tabs}>

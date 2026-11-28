@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   conImportiProposti,
   senzaListino,
+  notaScontoProgetto,
   importiVociModulo,
   prezziModuliScontati,
   ripartisciPerPesi,
@@ -72,6 +73,19 @@ describe('sconto del progetto', () => {
     expect(somma(netti)).toBe(1_860_000 - 186_000);
     expect(netti).toEqual([1_035_000, 450_000, 189_000]);
     expect(prezziModuliScontati([1000, 2000], 0)).toEqual([1000, 2000]);
+  });
+});
+
+describe('notaScontoProgetto — lo sconto si dichiara in fattura', () => {
+  it('dice lo sconto e il totale su cui è stato concordato', () => {
+    const nota = notaScontoProgetto(1_860_000, 100_000)!;
+    expect(nota).toMatch(/^Sconto concordato sul progetto: /);
+    expect(nota.replace(/\s/g, ' ')).toContain('1.000,00 €');
+    expect(nota.replace(/\s/g, ' ')).toContain('18.600,00 €');
+  });
+
+  it('senza sconto non scrive niente', () => {
+    expect(notaScontoProgetto(1_860_000, 0)).toBeNull();
   });
 });
 

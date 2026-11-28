@@ -527,6 +527,9 @@ model Progetto {
   dataInizio              DateTime?      @map("data_inizio")
   dataScadenza            DateTime?      @map("data_scadenza")
   valoreTotale            Int            @map("valore_totale")
+  // Sconto concordato sul progetto, in centesimi (titolare, 28/11/2026): con moduli presenti
+  // `valoreTotale` = somma dei prezzi dei moduli − sconto, e lo scrive `services/valoreProgetto.ts`.
+  scontoCentesimi         Int            @default(0) @map("sconto_centesimi")
   giurisdizionePrimariaId String?        @map("giurisdizione_primaria_id")
   giurisdizionePrimaria   Giurisdizione? @relation(fields: [giurisdizionePrimariaId], references: [id])
   // §2.8 — numero progressivo della lettera d'incarico (EL-<anno>-<seq>), assegnato dal

@@ -19,6 +19,7 @@ import { notificaStudioSilenziosa } from '../../services/notificheService.js';
 // ad-hoc: lo stato del modulo eredita la precedenza blocked/delayed (mai chiudere un modulo con una
 // voce bloccata) e il segnale di rischio si calcola sulle ore. Rilievo audit §03.
 import { calcolaStatoModulo, valutaSegnaleRischio } from '../../domain/stateEngine.js';
+import { notaScontoProgetto } from '../../domain/importiFatturabili.js';
 import {
   registraConsuntivazione,
   marcaRitardo,
@@ -839,6 +840,8 @@ export class PrismaApp implements AppPort {
         tipoClienteFiscale: input.tipoClienteFiscale,
         partitaIva: input.partitaIva || prog?.cliente?.piva || null,
         codiceFiscale: input.codiceFiscale || prog?.cliente?.codiceFiscale || null,
+        // Lo sconto del progetto si dichiara in fattura (titolare, 28/11/2026): esce nel PDF.
+        note: notaScontoProgetto((prog?.moduli || []).reduce((t, m) => t + m.prezzo, 0), prog?.scontoCentesimi ?? 0),
         canale: input.canale,
         statoSdi: 'n_a',
         condizionePagamento: 'bonifico_30gg',

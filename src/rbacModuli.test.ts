@@ -21,6 +21,7 @@ describe('moduloDellaRotta — mappa pattern → chiave modulo', () => {
     expect(moduloDellaRotta('/progetti')).toBe('projects');
     expect(moduloDellaRotta('/progetti/:id')).toBe('projects');
     expect(moduloDellaRotta('/progetti/:id/moduli/:moduloId')).toBe('projects');
+    expect(moduloDellaRotta('/progetti/:id/sconto')).toBe('projects');
     // Eccezione speculare, dallo stesso criterio: la chat del cliente è materia del modulo
     // Comunicazioni, non del progetto. «Segna come letto» invece resta un'azione di servizio
     // sulla scheda — se stesse su communications, chi ha `read` non riuscirebbe mai a spegnere

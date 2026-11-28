@@ -66,6 +66,25 @@ export function prezziModuliScontati(prezziCentesimi: ReadonlyArray<number>, sco
   return ripartisciPerPesi(somma - sconto, prezzi);
 }
 
+// `always`: l'italiano di Intl non separa le migliaia sotto 10.000 («1000,00 €»), in fattura sì.
+const EURO = new Intl.NumberFormat('it-IT', {
+  style: 'currency',
+  currency: 'EUR',
+  // Il tipo della libreria in uso conosce solo il booleano.
+  useGrouping: 'always' as unknown as boolean,
+});
+
+/**
+ * La riga che dichiara in fattura lo sconto del progetto («mostrato in fattura»); `null` se il
+ * progetto non ha uno sconto. Dice lo sconto e il totale su cui è stato concordato: gli importi
+ * delle righe restano quelli che l'operatore ha confermato.
+ */
+export function notaScontoProgetto(sommaModuliCentesimi: number, scontoCentesimi: number): string | null {
+  const sconto = scontoApplicabile(sommaModuliCentesimi, scontoCentesimi);
+  if (sconto === 0) return null;
+  return `Sconto concordato sul progetto: ${EURO.format(sconto / 100)} su ${EURO.format(sommaModuliCentesimi / 100)}.`;
+}
+
 interface MicrovocePerImporto { articolo?: { prezzoDefault?: number | null } | null }
 interface ModuloPerImporto { prezzo?: number | null; microvoci?: MicrovocePerImporto[] | null }
 

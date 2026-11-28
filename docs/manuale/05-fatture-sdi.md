@@ -19,6 +19,9 @@ tracciato **XML SdI** (FatturaPA).
   centesimo: la somma delle voci è sempre il prezzo del modulo. Se gli articoli non hanno listino,
   in parti uguali («parti uguali»). Lo calcola il server; l'operatore lo può cambiare. Un modulo
   senza prezzo lascia le voci con «importo mancante», da scrivere a mano prima di emettere.
+- **Sconto del progetto** (§01): si toglie da ogni modulo in proporzione al suo prezzo, quindi gli
+  importi proposti sono già al netto; la fattura emessa dal progetto porta la nota «Sconto concordato
+  sul progetto: X su Y», che esce nel PDF.
 - **Numerazione progressiva per serie e per anno**: il progressivo è `max(numeroProgressivoSerie) +
   1` fra le fatture **emesse nell'anno in corso**, quindi riparte da `001` a ogni gennaio (art. 21
   DPR 633/72): la prima fattura del 2027 è `FT-2027/001`, non `FT-2027/043`. Un indice UNIQUE
