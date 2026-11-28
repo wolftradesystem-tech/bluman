@@ -31,6 +31,7 @@ import { microvociDaDistinta, risolviRigheDistinta } from '../services/distintaT
 import { salvaPassaggiMicrovoce } from '../services/passaggiMicrovoce.js';
 import { caricoPerRisorse } from '../services/compitiAssegnati.js';
 import { riallineaValoreProgetto } from '../services/valoreProgetto.js';
+import { progettoPerRuolo } from '../services/proiezioneProgetto.js';
 import { CreaProgettoSchema, ConsuntivaOreSchema, NuovaComunicazioneSchema } from '../schemas/progetti.schema.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 import { leggiIntervalloData } from '../util/intervalloData.js';
@@ -501,7 +502,8 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     };
     if (!paginazione.paginata) {
       const projs = await prisma.progetto.findMany({ where, include, orderBy: { createdAt: 'desc' } });
-      return arricchisciProgetti(projs);
+      // Dalla riga escono i segreti di accesso e, per il cliente, i dati interni dello studio.
+      return arricchisciProgetti(projs).map((p) => progettoPerRuolo(p, req.ruolo));
     }
 
     const { page, limit, search, sortBy, sortOrder, skip, dataDa, dataA } = paginazione.parametri;
@@ -533,7 +535,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       prisma.progetto.count({ where }),
     ]);
     return reply.send({
-      data: arricchisciProgetti(projs),
+      data: arricchisciProgetti(projs).map((p) => progettoPerRuolo(p, req.ruolo)),
       meta: creaMetaPaginazione(page, limit, totale),
     });
   });
@@ -619,7 +621,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
         return reply.code(404).send({ errore: `Progetto ${id} non trovato` });
       }
     }
-    return reply.send({ ...dbProj, avanzamento: calcolaAvanzamento(dbProj) });
+    return reply.send(progettoPerRuolo({ ...dbProj, avanzamento: calcolaAvanzamento(dbProj) }, req.ruolo));
   });
 
   // §1.1 (docs/storico/PIANO_DI_MIGLIORAMENTO.md) — l'eliminazione transazionale esisteva già
