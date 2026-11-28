@@ -111,14 +111,28 @@ export async function fetchScadenzarioIncassiApi(
   );
 }
 
-/** `dataIncasso` è il giorno dell'incasso (AAAA-MM-GG); senza, il server usa oggi. */
-export async function registraIncassoApi(scadenzaId: string, input: { importoIncassatoCentesimi: number; dataIncasso?: string; contoBancarioId?: string; metodoPagamento?: string; riferimentoTransazione?: string; noteOperatore?: string }) {
+/** `dataIncasso` è il giorno dell'incasso (AAAA-MM-GG); senza, il server usa oggi. Il conto è obbligatorio. */
+export async function registraIncassoApi(scadenzaId: string, input: { importoIncassatoCentesimi: number; dataIncasso?: string; contoBancarioId: string; metodoPagamento?: string; riferimentoTransazione?: string; noteOperatore?: string }) {
   const res = await apiFetch(`${API_BASE}/invoices/scadenze/${scadenzaId}/incassi`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(input),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore durante la registrazione dell\'incasso'));
+  invalidateCache('fattur');
+  invalidateCache('scadenz');
+  invalidateCache('prima_nota');
+  return await res.json();
+}
+
+/** Storna un incasso registrato per errore: riga contraria, rata riaperta, uscita in Prima Nota. */
+export async function stornaIncassoApi(scadenzaId: string, incassoId: string, input: { motivo: string }) {
+  const res = await apiFetch(`${API_BASE}/invoices/scadenze/${scadenzaId}/incassi/${incassoId}/storno`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore durante lo storno dell\'incasso'));
   invalidateCache('fattur');
   invalidateCache('scadenz');
   invalidateCache('prima_nota');

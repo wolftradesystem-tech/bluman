@@ -9,6 +9,8 @@ describe('moduloDellaRotta — mappa pattern → chiave modulo', () => {
   it('le rotte di scadenzario e solleciti restano sotto scadenzario, non invoices', () => {
     expect(moduloDellaRotta('/invoices/scadenzario')).toBe('scadenzario');
     expect(moduloDellaRotta('/invoices/scadenze/:id/incassi')).toBe('scadenzario');
+    // Lo storno di un incasso è Scadenzario come l'incasso: storna chi può incassare.
+    expect(moduloDellaRotta('/invoices/scadenze/:id/incassi/:incassoId/storno')).toBe('scadenzario');
     expect(moduloDellaRotta('/invoices/scadenze/:id/anteprima-sollecito')).toBe('scadenzario');
     expect(moduloDellaRotta('/invoices/solleciti/insoluti')).toBe('scadenzario');
   });
