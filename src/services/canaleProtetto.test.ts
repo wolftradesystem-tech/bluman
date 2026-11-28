@@ -21,6 +21,8 @@ const {
   TESTO_NON_LEGGIBILE,
   archiviaAllegatiProtetti,
   contenutoDaScrivere,
+  contenutoMessaggio,
+  ingressoMessaggio,
   leggiAllegatoProtetto,
   messaggioLeggibile,
   preparaMessaggioProtetto,
@@ -192,5 +194,44 @@ describe('risposta a un rifiuto', () => {
     expect(rispostaAErroreCanale(errore, false)?.errore).toContain('CANALE_PROTETTO_CHIAVE');
     expect(rispostaAErroreCanale(new ErroreAllegato('troppo grande'), true)).toEqual({ stato: 400, errore: 'troppo grande' });
     expect(rispostaAErroreCanale(new Error('altro'), true)).toBeNull();
+  });
+});
+
+describe('ingresso di un messaggio', () => {
+  const file = { nome: 'visura.pdf', contentBase64: base64(PDF) };
+
+  it('dal portale il canale è quello protetto, qualunque cosa dichiari il cliente', () => {
+    expect(ingressoMessaggio({ canale: 'whatsapp', testo: ' ciao ' }, true)).toEqual({ canale: 'portal', protetto: true, testo: 'ciao', allegatiProtetti: [] });
+  });
+
+  it('nel canale protetto un file può viaggiare senza testo; altrove no, e lì non si accetta', () => {
+    expect(ingressoMessaggio({ canale: 'portal', allegatiProtetti: [file] }, false)).toMatchObject({ protetto: true, testo: '', allegatiProtetti: [file] });
+    expect(ingressoMessaggio({ canale: 'portal', testo: '' }, false)).toEqual({ errore: 'Canale e testo sono obbligatori.' });
+    expect(ingressoMessaggio({ canale: 'email', allegatiProtetti: [file] }, false)).toEqual({ errore: 'Canale e testo sono obbligatori.' });
+    expect(ingressoMessaggio({ canale: 'email', testo: 'x', allegatiProtetti: [file] }, false)).toEqual({ errore: expect.stringContaining('solo nel canale del portale') });
+    expect(ingressoMessaggio({ testo: 'x' }, false)).toEqual({ errore: 'Canale e testo sono obbligatori.' });
+  });
+
+  it('fuori dal canale protetto il contenuto resta com’è, con l’elenco degli allegati dichiarati', async () => {
+    const ingresso = ingressoMessaggio({ canale: 'email', testo: 'in chiaro' }, false);
+    if ('errore' in ingresso) throw new Error(ingresso.errore);
+    expect(await contenutoMessaggio(STUDIO, 'p-1', ingresso, [{ nome: 'a.pdf', url: '/uploads/a.pdf' }], false)).toEqual({
+      ok: true, testo: 'in chiaro', allegatiJson: JSON.stringify([{ nome: 'a.pdf', url: '/uploads/a.pdf' }]), conAllegati: true,
+    });
+    expect(archivio.size).toBe(0);
+  });
+
+  it('nel canale protetto cifra, ignora gli allegati dichiarati dal cliente e trasforma un rifiuto in risposta', async () => {
+    const ingresso = ingressoMessaggio({ testo: 'riservato', allegatiProtetti: [file] }, true);
+    if ('errore' in ingresso) throw new Error(ingresso.errore);
+    const scritto = await contenutoMessaggio(STUDIO, 'p-1', ingresso, [{ nome: 'esca.pdf', url: 'https://altrove.example/esca.pdf' }], true);
+    if (!scritto.ok) throw new Error(scritto.errore);
+    expect(scritto.testo).not.toContain('riservato');
+    const letto = messaggioLeggibile(riga(scritto));
+    expect(letto.testo).toBe('riservato');
+    expect(JSON.stringify(letto.allegatiJson)).not.toContain('esca.pdf');
+
+    process.env.CANALE_PROTETTO_CHIAVE = 'corta';
+    expect(await contenutoMessaggio(STUDIO, 'p-1', ingresso, null, true)).toMatchObject({ ok: false, stato: 503, errore: expect.not.stringContaining('CANALE_PROTETTO_CHIAVE') });
   });
 });

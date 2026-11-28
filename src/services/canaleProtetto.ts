@@ -183,6 +183,68 @@ export function rispostaAErroreCanale(err: unknown, perIlCliente: boolean): { st
   return null;
 }
 
+/** Canale, testo e allegati di un messaggio in arrivo su `POST /progetti/:id/comunicazioni`. */
+export interface IngressoMessaggio {
+  canale: string;
+  protetto: boolean;
+  testo: string;
+  allegatiProtetti: AllegatoInArrivo[];
+}
+
+/**
+ * Legge dal corpo della richiesta in quale canale va il messaggio e con cosa. Dal portale si scrive
+ * solo nel canale protetto: prima il cliente poteva scegliere «email» o «WhatsApp» e la riga
+ * nasceva come se fosse arrivata da lì, senza essere mai passata da lì. Nel canale protetto un file
+ * può viaggiare da solo; altrove il testo resta obbligatorio e gli allegati protetti non si accettano.
+ */
+export function ingressoMessaggio(
+  body: { canale?: string | null; testo?: string | null; allegatiProtetti?: AllegatoInArrivo[] | null },
+  dalCliente: boolean,
+): IngressoMessaggio | { errore: string } {
+  const canale = dalCliente ? CANALE_PROTETTO : (body.canale ?? '').trim().slice(0, 50);
+  const protetto = canale === CANALE_PROTETTO;
+  const ricevuti = body.allegatiProtetti ?? [];
+  const testo = (body.testo ?? '').trim();
+  if (!canale || (!testo && !(protetto && ricevuti.length > 0))) return { errore: 'Canale e testo sono obbligatori.' };
+  if (!protetto && ricevuti.length > 0) return { errore: 'Gli allegati protetti si mandano solo nel canale del portale.' };
+  return { canale, protetto, testo, allegatiProtetti: protetto ? ricevuti : [] };
+}
+
+/**
+ * Il contenuto del messaggio come va scritto a database. Nel canale protetto: allegati cifrati in
+ * archivio, testo ed elenco cifrati nella riga; gli allegati «dichiarati» dal cliente (un elenco di
+ * indirizzi) non si accettano, perché non ha una rotta di caricamento e sarebbero indirizzi scelti
+ * da lui mostrati allo studio come file. Un rifiuto del canale torna come risposta pronta, con
+ * l'errore da scrivere nel log; ogni altro errore si rilancia.
+ */
+export async function contenutoMessaggio(
+  tenantId: string,
+  progettoId: string,
+  ingresso: IngressoMessaggio,
+  allegatiJson: unknown,
+  dalCliente: boolean,
+): Promise<
+  | { ok: true; testo: string; allegatiJson: string | null; conAllegati: boolean }
+  | { ok: false; stato: number; errore: string; err: unknown }
+> {
+  if (!ingresso.protetto) {
+    const elenco = allegatiJson ? (typeof allegatiJson === 'string' ? allegatiJson : JSON.stringify(allegatiJson)) : null;
+    return { ok: true, testo: ingresso.testo, allegatiJson: elenco, conAllegati: elenco !== null };
+  }
+  try {
+    const preparato = await preparaMessaggioProtetto(tenantId, progettoId, {
+      testo: ingresso.testo,
+      allegatiJson: dalCliente ? null : allegatiJson,
+      allegatiProtetti: ingresso.allegatiProtetti,
+    });
+    return { ok: true, ...preparato };
+  } catch (err) {
+    const risposta = rispostaAErroreCanale(err, dalCliente);
+    if (!risposta) throw err;
+    return { ok: false, ...risposta, err };
+  }
+}
+
 /** Il minimo che serve di una riga `comunicazione_progetto` per leggerne il contenuto. */
 export interface RigaMessaggio {
   id: string;
