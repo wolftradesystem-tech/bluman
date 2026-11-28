@@ -27,6 +27,7 @@ import { livelloModuloUtente } from '../util/permessiModulo.js';
 import type { ModuloChiaveRbac } from '../util/rbacModuli.js';
 import { STATI_MICROVOCE, STATI_PROGETTO, recordAudit, clienteDellaRichiesta } from '../util/serverHelpers.js';
 import { microvociDaDistinta, risolviRigheDistinta } from '../services/distintaTemplate.js';
+import { creaPassaggioDaTemplate, formDegliArticoli } from '../services/formArticolo.js';
 import { salvaPassaggiMicrovoce } from '../services/passaggiMicrovoce.js';
 import { caricoPerRisorse } from '../services/compitiAssegnati.js';
 import { riallineaValoreProgetto } from '../services/valoreProgetto.js';
@@ -892,7 +893,8 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
         });
       }
 
-      const righe = risolviRigheDistinta(template.righeDistinta);
+      const form = await formDegliArticoli(prisma, tenantId, template.righeDistinta.map((r) => r.articolo.formMasterId));
+      const righe = risolviRigheDistinta(template.righeDistinta, form);
       if (righe.length === 0) {
         return reply.code(409).send({
           errore:
@@ -929,19 +931,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
               },
             });
             for (const passaggio of passaggi) {
-              await tx.passaggioProgetto.create({
-                data: {
-                  tenantId,
-                  microvoceProgettoId: creata.id,
-                  titolo: passaggio.titolo,
-                  tipo: passaggio.tipo,
-                  chi: passaggio.chi,
-                  ordine: passaggio.ordine,
-                  descrizione: passaggio.descrizione,
-                  campiFormJson: passaggio.campiFormJson as never,
-                  stato: 'pending',
-                },
-              });
+              await creaPassaggioDaTemplate(tx, { tenantId, microvoceProgettoId: creata.id }, passaggio);
             }
           }
 
