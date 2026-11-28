@@ -120,10 +120,16 @@ describe('DocumentEditorPage — il livello di firma segue il modello e il docum
         <DocumentEditorPage />
       </MemoryRouter>,
     );
-    await waitFor(() => expect(livelloSegnato().join(' ')).toContain('FEA — '));
-    expect((screen.getByRole('button', { name: /SES — Semplice/ }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: /FEQ — Qualificata/ }) as HTMLButtonElement).disabled).toBe(false);
-    expect(screen.getByRole('note').textContent).toContain('Il modello richiede almeno la firma FEA');
+    await waitFor(() => expect(document.body.textContent).toContain('Mandato di Studio Vero Srl'));
+    expect(livelloSegnato().join(' ')).toContain('FEA — ');
+    // I pulsanti si cercano per testo, non per ruolo e nome: su una pagina così grande ogni ricerca
+    // per ruolo ricalcola l'albero di accessibilità, e ripetuta dentro `waitFor` faceva di questo
+    // test il più caro del file (misurato sotto carico: 3,3 s contro 1,5 s dei vicini).
+    const pulsante = (testo: RegExp) =>
+      Array.from(document.querySelectorAll('button')).find((b) => testo.test(b.textContent || '')) as HTMLButtonElement;
+    expect(pulsante(/SES — Semplice/).disabled).toBe(true);
+    expect(pulsante(/FEQ — Qualificata/).disabled).toBe(false);
+    expect(document.querySelector('[role="note"]')?.textContent).toContain('Il modello richiede almeno la firma FEA');
   });
 
   it('modello senza livello dichiarato → firma semplice, come prima', async () => {
