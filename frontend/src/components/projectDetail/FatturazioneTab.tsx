@@ -702,7 +702,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                                   {v.criterio && (
                                     <span
                                       style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}
-                                      title={spiegaCriterio(v.criterio, v.moduloNome).spiegazione}
+                                      title={spiegaCriterio(v.criterio, v.moduloNome, proposti.scontoEuro).spiegazione}
                                     >
                                       {spiegaCriterio(v.criterio, v.moduloNome).etichetta}
                                     </span>

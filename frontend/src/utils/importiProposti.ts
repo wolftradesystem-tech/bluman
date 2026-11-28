@@ -37,15 +37,20 @@ export function leggiImportiProposti(progettoDalServer: unknown): ImportiPropost
   };
 }
 
-/** L'etichetta accanto all'importo proposto e la frase che lo spiega (regola 12). */
-export function spiegaCriterio(criterio: CriterioImporto, moduloNome: string): { etichetta: string; spiegazione: string } {
+/**
+ * L'etichetta accanto all'importo proposto e la frase che lo spiega (regola 12). Con uno sconto
+ * sul progetto il prezzo netto del modulo non coincide con la somma dei listini anche quando il
+ * prezzo pieno coincideva: la frase lo dice, invece di far cercare una differenza che non c'è.
+ */
+export function spiegaCriterio(criterio: CriterioImporto, moduloNome: string, scontoEuro = 0): { etichetta: string; spiegazione: string } {
+  const prezzo = scontoEuro > 0 ? `Il prezzo del modulo «${moduloNome}», tolto lo sconto del progetto,` : `Il prezzo del modulo «${moduloNome}»`;
   if (criterio === 'listino') {
     return { etichetta: 'da listino', spiegazione: 'Prezzo di listino dell’articolo: modificalo se l’attività vale un importo diverso.' };
   }
   if (criterio === 'proporzionale_listino') {
     return {
       etichetta: 'in proporzione al listino',
-      spiegazione: `Il prezzo del modulo «${moduloNome}» è diverso dalla somma dei listini: è ripartito fra le attività in proporzione al listino. Modificalo se l’attività vale un importo diverso.`,
+      spiegazione: `${prezzo} è diverso dalla somma dei listini: è ripartito fra le attività in proporzione al listino. Modificalo se l’attività vale un importo diverso.`,
     };
   }
   return {
