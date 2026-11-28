@@ -1,10 +1,12 @@
-# E2E Playwright — i cinque flussi critici
+# E2E Playwright — i sei flussi critici
 
 Suite end-to-end dei flussi che, se si rompono, fermano lo studio e i clienti:
 login con cambio password obbligatorio, firma SES della lettera d'incarico dal
 portale cliente, emissione fattura dal compositore di microvoci, abbinamento di
-un messaggio del cliente alla micro-voce di cui parla, e il percorso dei soldi
-dall'inizio alla fine (progetto → fattura → incasso → Prima Nota → saldo del conto).
+un messaggio del cliente alla micro-voce di cui parla, il percorso dei soldi
+dall'inizio alla fine (progetto → fattura → incasso → Prima Nota → saldo del conto), e il
+percorso del cliente (invito → richiesta compilata → messaggi cifrati con allegati →
+approvazione dello studio).
 
 ## Architettura: database usa-e-getta, mai produzione
 
@@ -98,7 +100,7 @@ magic link e OTP soggetti a anti-abuso.
 Conto, regime e anagrafica sono **dati di prova**, scritti solo se mancano: l'overlay non
 sovrascrive ciò che una corsa precedente, o chi sta provando l'app, ha cambiato.
 
-I cinque flussi:
+I sei flussi:
 
 - `flusso-login.spec.ts` — login dell'invitato, modale «Primo Accesso», cambio
   password, riaccesso con la nuova credenziale.
@@ -126,6 +128,30 @@ I cinque flussi:
   dell'importo incassato. Ogni corsa crea un progetto suo, quindi si rilancia senza reset.
   È il test dei passaggi fra una pagina e l'altra: i difetti dell'analisi del 26/11
   stavano tutti lì.
+
+- `flusso-percorso-cliente.spec.ts` — il percorso del cliente in fila, con due sessioni
+  separate (studio e cliente): lo studio apre un incarico per un cliente nuovo, gli prepara una
+  richiesta di dati e lo avvisa; il cliente entra dal **Magic Link letto nell'email**, trova la
+  richiesta in «Tocca a te», la compila con allegato e nota e manda il documento atteso (senza
+  file non parte); i due si scrivono nel **canale protetto** con un file per parte, e ciascuno
+  riscarica il file dell'altro identico; a riposo **niente è in chiaro** (righe del database,
+  campanella, file in `uploads/`, email di avviso); un altro cliente dello studio riceve 404 e chi
+  non ha accesso 401; lo studio fa sue le risposte («Usa tutte le risposte del cliente»), chiude
+  il passaggio col ✓ e il cliente lo vede fra le «Chiuse» senza poterlo riscrivere (409). Ogni
+  corsa crea cliente e incarico suoi. È l'unico flusso che legge il database direttamente
+  (`AMBIENTE_E2E.databaseUrl`, cablato su localhost): l'API restituisce il testo decifrato e non
+  può dire com'è conservato.
+
+## Senza Docker
+
+Dove Docker non c'è (una sessione cloud, un runner isolato) la preparazione accetta
+`E2E_SENZA_DOCKER=1`: salta i due container e usa il Postgres e la casella di prova che chi lancia
+ha già in ascolto sulle stesse porte di localhost (5433 o `E2E_DB_PORT`; 1025 e 8025). Tutto il
+resto è uguale: l'URL del database resta cablato su localhost, le migrazioni e i seed sono gli stessi.
+
+```bash
+E2E_SENZA_DOCKER=1 npm run test:e2e
+```
 
 ## Pulizia
 

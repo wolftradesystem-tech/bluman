@@ -14,6 +14,9 @@ export const AMBIENTE_E2E = {
   advisorEmail: 'lorenzo.marino@bluecode.advisory',
   clienteBelfort: { id: 'cli-03', email: 'jp.belfort@belfort-sa.lu' },
   progettoNome: 'Incarico E2E — Belfort Industries',
+  // Lo stesso database usa-e-getta di scripts/e2e/prepara.mjs: l'host è cablato su localhost, la
+  // variabile sposta solo la porta. Serve alle prove che guardano com'è scritto un dato a riposo.
+  databaseUrl: `postgresql://bluman:bluman_dev_password@localhost:${/^\d{2,5}$/.test(process.env.E2E_DB_PORT || '') ? process.env.E2E_DB_PORT : '5433'}/bluman_e2e?schema=public`,
 } as const;
 
 /** Login staff via API: restituisce il JWT (niente TOTP: gli utenti del seed non ce l'hanno). */
@@ -67,4 +70,49 @@ export async function leggiOtpDaMailpit(request: APIRequestContext, timeoutMs = 
     await new Promise((risolvi) => setTimeout(risolvi, 500));
   }
   throw new Error(`Nessuna email con OTP trovata in Mailpit entro ${timeoutMs} ms`);
+}
+
+/**
+ * Un'email arrivata a `destinatario` con `oggetto` (un pezzo dell'oggetto): la aspetta in Mailpit e
+ * ne restituisce oggetto e corpo HTML. Non svuota la coda: chi legge un avviso non deve portare via
+ * le email degli altri flussi. Il destinatario si cerca dentro il campo `To` così com'è, che in
+ * Mailpit è un elenco di indirizzi.
+ */
+export async function leggiEmailDaMailpit(
+  request: APIRequestContext,
+  filtro: { destinatario: string; oggetto: string },
+  timeoutMs = 20_000,
+): Promise<{ oggetto: string; html: string }> {
+  const inizio = Date.now();
+  while (Date.now() - inizio < timeoutMs) {
+    const res = await request.get(`${AMBIENTE_E2E.mailpit}/api/v1/messages`);
+    if (res.ok()) {
+      const { messages = [] } = await res.json();
+      for (const messaggio of messages) {
+        if (!String(messaggio.Subject ?? '').includes(filtro.oggetto)) continue;
+        if (!JSON.stringify(messaggio.To ?? '').toLowerCase().includes(filtro.destinatario.toLowerCase())) continue;
+        const dettaglio = await request.get(`${AMBIENTE_E2E.mailpit}/api/v1/message/${messaggio.ID}`);
+        if (!dettaglio.ok()) continue;
+        const corpo = await dettaglio.json();
+        return { oggetto: String(corpo.Subject ?? ''), html: String(corpo.HTML ?? '') };
+      }
+    }
+    await new Promise((risolvi) => setTimeout(risolvi, 500));
+  }
+  throw new Error(`Nessuna email «${filtro.oggetto}» per ${filtro.destinatario} in Mailpit entro ${timeoutMs} ms`);
+}
+
+/** Tutte le email che Mailpit ha in coda adesso (oggetto, corpo HTML e testo), senza aspettare. */
+export async function tutteLeEmailInMailpit(request: APIRequestContext): Promise<Array<{ oggetto: string; html: string; testo: string }>> {
+  const res = await request.get(`${AMBIENTE_E2E.mailpit}/api/v1/messages?limit=500`);
+  if (!res.ok()) throw new Error(`Mailpit non risponde: ${res.status()}`);
+  const { messages = [] } = await res.json();
+  const trovate: Array<{ oggetto: string; html: string; testo: string }> = [];
+  for (const messaggio of messages) {
+    const dettaglio = await request.get(`${AMBIENTE_E2E.mailpit}/api/v1/message/${messaggio.ID}`);
+    if (!dettaglio.ok()) throw new Error(`Mailpit non restituisce l'email ${messaggio.ID}: ${dettaglio.status()}`);
+    const corpo = await dettaglio.json();
+    trovate.push({ oggetto: String(corpo.Subject ?? ''), html: String(corpo.HTML ?? ''), testo: String(corpo.Text ?? '') });
+  }
+  return trovate;
 }
