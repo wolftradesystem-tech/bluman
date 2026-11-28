@@ -60,6 +60,9 @@ export const ROTTE_CLIENTE_CONSENTITE = new Set<string>([
   'POST /portal/proposte-dati',
   'GET /portal/addendum',
   'POST /portal/addendum',
+  // La pagina personale: stato degli incarichi, cosa tocca al cliente, richieste dello studio.
+  'GET /portal/riepilogo',
+  'POST /portal/richieste/:passaggioId/risposta',
   'GET /portal/documenti',
   'GET /portal/documenti/:id/download',
   'POST /portal/documenti/:id/richiesta-modifica',

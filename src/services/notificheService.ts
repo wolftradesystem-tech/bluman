@@ -64,6 +64,8 @@ export const EVENTI_NOTIFICA = [
   // Lo studio ha preparato per il cliente qualcosa da compilare o da mandare (un passaggio
   // «del cliente» di un'attività): tocca a lui, e deve saperlo senza aprire il portale per caso.
   'richiesta_cliente',
+  // …e il cliente l'ha evasa dal portale: lo studio deve controllarla e chiudere il passaggio.
+  'risposta_cliente',
 ] as const;
 
 export type TipoEventoNotifica = (typeof EVENTI_NOTIFICA)[number];
