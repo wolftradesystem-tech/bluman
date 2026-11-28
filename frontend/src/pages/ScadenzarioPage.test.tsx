@@ -1,7 +1,7 @@
 // Analisi del 26/11, E8 — l'incasso si registrava senza data e senza conto: il modale non li
 // chiedeva, quindi ogni incasso prendeva la data di oggi e nessuno sceglieva dove entrava il denaro.
 // Dal 28/11 (titolare) il conto è obbligatorio e un incasso sbagliato si storna dalla rata.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { ScadenzarioPage } from './ScadenzarioPage';
 import { fetchScadenzarioIncassiApi, registraIncassoApi, stornaIncassoApi, fetchClienti, fetchContiBancariApi } from '../api/client';
@@ -39,6 +39,19 @@ async function apriModale() {
   fireEvent.click(await screen.findByRole('button', { name: /Registra Incasso/ }));
   return screen.findByLabelText(/Data dell'incasso/);
 }
+
+// Il primo mount del file paga il riscaldamento di React e jsdom (misurato: 228 ms contro ~35 ms
+// dei successivi): sotto il carico di più giri di prove insieme ha portato il primo test oltre i
+// 5 s (run 46151502939). Lo si paga qui, una volta, fuori dai test, col modale compreso.
+beforeAll(async () => {
+  (fetchScadenzarioIncassiApi as ReturnType<typeof vi.fn>).mockResolvedValue([RATA]);
+  (fetchClienti as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+  mockConti.mockResolvedValue(CONTI);
+  const pagina = render(<ScadenzarioPage />);
+  fireEvent.click(await screen.findByRole('button', { name: /Registra Incasso/ }));
+  await screen.findByLabelText(/Data dell'incasso/);
+  pagina.unmount();
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
