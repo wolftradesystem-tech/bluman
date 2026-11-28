@@ -3,15 +3,17 @@
 // Quelli del canale protetto non hanno un indirizzo da aprire: si scaricano con il token della
 // sessione (`scaricaAllegatoProtettoApi`), e un errore si legge accanto al file. Gli allegati degli
 // altri canali restano un collegamento, com'erano.
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { allegatiDelMessaggio, scaricaAllegatoProtettoApi, type AllegatoMessaggio } from '../api/canaleProtetto';
 import { urlDocumentoAssoluto } from '../api/http';
 
 export interface AllegatiMessaggioProps {
   messaggio: { allegatiJson?: unknown; allegati?: unknown };
+  /** Un'azione in più accanto a «Scarica», per gli allegati che hanno un indirizzo (non i protetti). */
+  azione?: (allegato: AllegatoMessaggio) => ReactNode;
 }
 
-function RigaAllegato({ allegato }: { allegato: AllegatoMessaggio }) {
+function RigaAllegato({ allegato, azione }: { allegato: AllegatoMessaggio; azione?: AllegatiMessaggioProps['azione'] }) {
   const [scaricando, setScaricando] = useState(false);
   const [errore, setErrore] = useState<string | null>(null);
 
@@ -37,13 +39,19 @@ function RigaAllegato({ allegato }: { allegato: AllegatoMessaggio }) {
           {allegato.dimensione && <div style={{ fontSize: 9.5, color: 'var(--muted)' }}>{allegato.dimensione}</div>}
         </div>
         {allegato.protetto ? (
-          <button type="button" className="btn btn-sm" onClick={scarica} disabled={scaricando} title="Il file si scarica solo da qui, con il tuo accesso: non esiste un link da inoltrare.">
-            {scaricando ? 'Scarico…' : '⬇️ Scarica'}
-          </button>
+          // Senza indirizzo il messaggio è appena partito: il file si potrà riscaricare a scrittura finita.
+          allegato.url ? (
+            <button type="button" className="btn btn-sm" onClick={scarica} disabled={scaricando} title="Il file si scarica solo da qui, con il tuo accesso: non esiste un link da inoltrare.">
+              {scaricando ? 'Scarico…' : '⬇️ Scarica'}
+            </button>
+          ) : <span style={{ fontSize: 10, color: 'var(--muted)' }}>in invio…</span>
         ) : (
-          <a className="btn btn-sm" href={urlDocumentoAssoluto(allegato.url || '#')} target="_blank" rel="noreferrer" download={allegato.nome} style={{ textDecoration: 'none' }}>
-            ⬇️ Scarica
-          </a>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <a className="btn btn-sm" href={urlDocumentoAssoluto(allegato.url || '#')} target="_blank" rel="noreferrer" download={allegato.nome} style={{ textDecoration: 'none' }}>
+              ⬇️ Scarica
+            </a>
+            {azione?.(allegato)}
+          </div>
         )}
       </div>
       {errore && <div role="alert" style={{ fontSize: 10.5, color: 'var(--red)', marginTop: 4 }}>{errore}</div>}
@@ -51,13 +59,13 @@ function RigaAllegato({ allegato }: { allegato: AllegatoMessaggio }) {
   );
 }
 
-export function AllegatiMessaggio({ messaggio }: AllegatiMessaggioProps) {
+export function AllegatiMessaggio({ messaggio, azione }: AllegatiMessaggioProps) {
   const allegati = allegatiDelMessaggio(messaggio);
   if (allegati.length === 0) return null;
   return (
     <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ fontSize: 9.5, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase' }}>📎 Allegati ({allegati.length})</div>
-      {allegati.map((allegato, indice) => <RigaAllegato key={`${allegato.url}-${indice}`} allegato={allegato} />)}
+      {allegati.map((allegato, indice) => <RigaAllegato key={`${allegato.url}-${indice}`} allegato={allegato} azione={azione} />)}
     </div>
   );
 }
