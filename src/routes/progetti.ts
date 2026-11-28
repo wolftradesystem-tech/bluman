@@ -19,7 +19,8 @@ import type { AppPort } from '../services/appPort.js';
 import { conContestoInTransazione, prisma } from '../util/prismaClient.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { messaggioBloccoKyc, operativitaBloccataDaKyc } from '../services/kycGate.js';
-import { notificaStudio } from '../services/notificheService.js';
+import { avvisaDopoMessaggio } from '../services/avvisiCanaleProtetto.js';
+import { CANALE_PROTETTO, messaggioLeggibile, preparaMessaggioProtetto, rispostaAErroreCanale } from '../services/canaleProtetto.js';
 // §16 — le percentuali e gli stati aggregati arrivano da qui, non dal frontend.
 import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from '../services/calcoloService.js';
 import { ricercaGlobale, MODULO_DEL_GRUPPO } from '../services/ricercaGlobaleService.js';
@@ -82,7 +83,9 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     // *perché* quel messaggio è lì — `origine` distingue un abbinamento che qualcuno ha dichiarato
     // da uno che il contesto ha dedotto, ed è la differenza che permette di correggere il secondo.
     const abbinamenti = await mappaAbbinamentiDelProgetto(req.tenantId, req.params.id);
-    return msgs.map((m) => {
+    // I messaggi del canale protetto stanno a database cifrati: `messaggioLeggibile` li apre per
+    // chi è arrivato fin qui (cliente della pratica, o operatore col permesso Comunicazioni).
+    return msgs.map(messaggioLeggibile).map((m) => {
       // Lo stato di recapito, con la sua unica deduzione («in entrata ⇒ consegnato»), sta in
       // `proiettaRecapito`: la stessa regola serve alla scheda della micro-voce, e duplicarla qui
       // sarebbe la terza copia di una cosa già sbagliata due volte (le spunte blu su messaggi che
@@ -179,10 +182,18 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     }
     const body = parseComm.data;
     const clienteId = req.ruolo === 'cliente' ? clienteDellaRichiesta(req) : null;
-    const canale = (body.canale ?? '').trim().slice(0, 50);
+    // Dal portale si scrive solo nel canale protetto: prima il cliente poteva scegliere «email» o
+    // «WhatsApp» e la riga nasceva come se fosse arrivata da lì, senza essere mai passata da lì.
+    const canale = clienteId ? CANALE_PROTETTO : (body.canale ?? '').trim().slice(0, 50);
+    const protetto = canale === CANALE_PROTETTO;
+    const allegatiProtetti = protetto ? (body.allegatiProtetti ?? []) : [];
     const testo = (body.testo ?? '').trim();
-    if (!canale || !testo) {
+    // Nel canale protetto un file può viaggiare da solo; altrove il testo resta obbligatorio.
+    if (!canale || (!testo && allegatiProtetti.length === 0)) {
       return reply.code(400).send({ errore: 'Canale e testo sono obbligatori.' });
+    }
+    if (!protetto && (body.allegatiProtetti?.length ?? 0) > 0) {
+      return reply.code(400).send({ errore: 'Gli allegati protetti si mandano solo nel canale del portale.' });
     }
 
     // Un messaggio può **nascere abbinato**: chi scrive da dentro una micro-voce non sta abbinando
@@ -242,6 +253,30 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
         ? (clienteId ?? await clienteDellaPratica(tenantId, req.params.id))
         : null;
 
+      // Canale protetto: allegati cifrati in archivio, testo ed elenco cifrati nella riga. Gli
+      // allegati «dichiarati» (un elenco di indirizzi) dal cliente non si accettano: non ha una
+      // rotta di caricamento, quindi sarebbero indirizzi scelti da lui mostrati allo studio come file.
+      let contenuto: { testo: string; allegatiJson: string | null; conAllegati: boolean };
+      if (protetto) {
+        try {
+          contenuto = await preparaMessaggioProtetto(tenantId, req.params.id, {
+            testo,
+            allegatiJson: clienteId ? null : body.allegatiJson,
+            allegatiProtetti,
+          });
+        } catch (err) {
+          const risposta = rispostaAErroreCanale(err, Boolean(clienteId));
+          if (!risposta) throw err;
+          req.log.warn({ err, progettoId: req.params.id }, 'canale protetto: messaggio rifiutato');
+          return reply.code(risposta.stato).send({ errore: risposta.errore });
+        }
+      } else {
+        const allegatiJson = body.allegatiJson
+          ? (typeof body.allegatiJson === 'string' ? body.allegatiJson : JSON.stringify(body.allegatiJson))
+          : null;
+        contenuto = { testo, allegatiJson, conAllegati: allegatiJson !== null };
+      }
+
       const msg = await prisma.$transaction(async (tx) =>
         conContestoInTransazione(tx, async () => {
           const creato = await tx.comunicazioneProgetto.create({
@@ -252,9 +287,9 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
               mittente,
               destinatario,
               direzione,
-              testo,
+              testo: contenuto.testo,
               chatId,
-              allegatiJson: body.allegatiJson ? (typeof body.allegatiJson === 'string' ? body.allegatiJson : JSON.stringify(body.allegatiJson)) : null,
+              allegatiJson: contenuto.allegatiJson,
               externalId: JSON.stringify(statoIniziale),
             },
           });
@@ -280,20 +315,19 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
           return creato;
         }),
       );
-      // Blocco 3 — messaggio in arrivo dal cliente: lo studio viene avvisato subito.
-      if (direzione === 'entrata' || direzione === 'ingresso') {
-        const progetto = await prisma.progetto.findUnique({
-          where: { id: req.params.id },
-          include: { cliente: { select: { nome: true } } },
+      // Blocco 3 — chi deve sapere che c'è un messaggio lo viene a sapere subito. Per il canale
+      // protetto l'avviso non porta il testo. Un avviso non riuscito si scrive nel log e non
+      // annulla il messaggio, che a questo punto è già nel fascicolo.
+      try {
+        await avvisaDopoMessaggio(tenantId, {
+          progettoId: req.params.id,
+          canale,
+          inEntrata,
+          conAllegati: contenuto.conAllegati,
+          testoInChiaro: testo,
         });
-        if (progetto) {
-          await notificaStudio(tenantId, {
-            tipoEvento: 'messaggio_cliente',
-            oggetto: 'Nuovo messaggio dal cliente',
-            corpo: `${progetto.cliente.nome} ha scritto su «${progetto.nome}»: ${(body.testo || '').slice(0, 120)}`,
-            link: `/projects/${progetto.id}`,
-          }).catch(() => {});
-        }
+      } catch (err) {
+        req.log.error({ err, progettoId: req.params.id }, 'avviso del nuovo messaggio non riuscito');
       }
       // Qui c'era un secondo invio WhatsApp, fatto di nascosto da questa rotta con
       // `process.env.WHATSAPP_ACCESS_TOKEN` e `process.env.WA_PHONE_ID`. Tre guasti in venti
@@ -307,7 +341,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       // si chiede a `POST /comunicazioni/invia-whatsapp`, che legge le credenziali dello studio
       // e risponde con il motivo quando WhatsApp non accetta.
 
-      return reply.code(201).send(msg);
+      return reply.code(201).send(messaggioLeggibile(msg));
     } catch (err: any) {
       // progettoId inesistente: niente fascicolo in cui registrare, non un 201 fasullo.
       if (err?.code === 'P2003') {

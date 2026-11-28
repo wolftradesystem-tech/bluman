@@ -57,6 +57,7 @@ import { registraRotteClienti } from './routes/clienti.js';
 // Rotte progetti ed esecuzione (split dei monoliti): la registrazione avviene
 // dentro il wrapper register di buildServer, nello stesso punto di prima.
 import { registraRotteProgetti } from './routes/progetti.js';
+import { registraRotteCanaleProtetto } from './routes/canaleProtetto.js';
 // Rotte contabilità (split dei monoliti): la registrazione avviene dentro il
 // wrapper register di buildServer, nello stesso punto di prima.
 import { registraRotteContabilita } from './routes/contabilita.js';
@@ -743,6 +744,8 @@ export function buildServer(app: AppPort): FastifyInstance {
   // estratte in src/routes/progetti.ts: stessa registrazione, sempre dentro
   // questo wrapper.
   await registraRotteProgetti(server, app);
+  // Scarico autenticato degli allegati del canale protetto (cifrati in archivio).
+  await registraRotteCanaleProtetto(server);
 
   // ─── COLLEGAMENTO CHAT → PRATICA (LINK TELEGRAM) ──────────────────
   // Rotte in src/routes/collegamentoChat.ts: il link firmato per agganciare la chat

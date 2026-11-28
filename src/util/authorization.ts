@@ -75,6 +75,8 @@ export const ROTTE_CLIENTE_CONSENTITE = new Set<string>([
   'GET /progetti/:id/comunicazioni',
   'POST /progetti/:id/comunicazioni',
   'PATCH /progetti/:id/comunicazioni/segna-lette',
+  // Allegati del canale protetto: la rotta verifica che la pratica sia del cliente della sessione.
+  'GET /progetti/:id/comunicazioni/:msgId/allegati/:indice',
   'GET /notifiche',
   'PATCH /notifiche/read-all',
   'GET /stream',

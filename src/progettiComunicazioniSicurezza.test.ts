@@ -29,9 +29,10 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
       },
     },
     progetto: {
-      findUnique: async () => ({
+      findFirst: async () => ({
         id: 'proj-1',
         nome: 'Progetto Cliente',
+        clienteId: 'cli-1',
         cliente: { nome: 'Cliente Verificato' },
       }),
     },
