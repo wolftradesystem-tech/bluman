@@ -25,6 +25,11 @@ const AMBIENTE_DB = {
   ADMIN_DATABASE_URL: URL_DB_E2E,
 };
 
+// Senza Docker (E2E_SENZA_DOCKER=1): Postgres e Mailpit li ha già avviati chi lancia, sulle stesse
+// porte di localhost. Serve dove Docker non c'è (una sessione cloud, un runner senza Docker): la
+// preparazione salta solo i container, e l'URL resta cablato su localhost come sempre.
+const SENZA_DOCKER = process.env.E2E_SENZA_DOCKER === '1';
+
 const dormi = (ms) => new Promise((risolvi) => setTimeout(risolvi, ms));
 
 /**
@@ -83,6 +88,26 @@ function assicuraContainer(nome, argomentiCreazione) {
   }
 }
 
+/** Quanti utenti ha il database di prova: 0 vuol dire che il seed master non è ancora passato. */
+function contaUtenti() {
+  const esito = SENZA_DOCKER
+    ? spawnSync(
+        process.execPath,
+        ['--input-type=module', '-e', "import { PrismaClient } from '@prisma/client'; const p = new PrismaClient(); const r = await p.$queryRaw`select count(*)::int as n from \"user\"`; console.log(r[0].n); await p.$disconnect();"],
+        { encoding: 'utf8', env: { ...process.env, ...AMBIENTE_DB } },
+      )
+    : spawnSync(
+        'docker',
+        ['exec', 'bluman-e2e-pg', 'psql', '-U', 'bluman', '-d', 'bluman_e2e', '-tAc', 'select count(*) from "user"'],
+        { encoding: 'utf8' },
+      );
+  if (esito.status !== 0) {
+    console.error(`❌ Impossibile contare gli utenti sul database E2E.${esito.stderr ? `\n${esito.stderr}` : ''}`);
+    process.exit(1);
+  }
+  return Number(esito.stdout.trim());
+}
+
 async function attendiPostgres() {
   for (let tentativo = 0; tentativo < 30; tentativo++) {
     const esito = spawnSync('docker', ['exec', 'bluman-e2e-pg', 'pg_isready', '-U', 'bluman'], { stdio: 'ignore' });
@@ -96,35 +121,30 @@ async function attendiPostgres() {
 async function main() {
   console.log('── Preparazione ambiente E2E ──────────────────────────────');
 
-  if (spawnSync('docker', ['info'], { stdio: 'ignore' }).status !== 0) {
-    console.error('❌ Docker non è in esecuzione: avvia Docker Desktop e riprova.');
-    process.exit(1);
-  }
+  if (SENZA_DOCKER) {
+    console.log(`✓ Senza Docker: uso il Postgres già in ascolto su localhost:${PORTA_DB_E2E} e Mailpit su 1025/8025`);
+  } else {
+    if (spawnSync('docker', ['info'], { stdio: 'ignore' }).status !== 0) {
+      console.error('❌ Docker non è in esecuzione: avvia Docker Desktop e riprova.');
+      process.exit(1);
+    }
 
-  assicuraContainer('bluman-e2e-pg', [
-    '-e', 'POSTGRES_USER=bluman',
-    '-e', 'POSTGRES_PASSWORD=bluman_dev_password',
-    '-e', 'POSTGRES_DB=bluman_e2e',
-    '-p', `${PORTA_DB_E2E}:5432`,
-    'postgres:16-alpine',
-  ]);
-  assicuraContainer('bluman-e2e-mailpit', ['-p', '1025:1025', '-p', '8025:8025', 'axllent/mailpit']);
-  await attendiPostgres();
+    assicuraContainer('bluman-e2e-pg', [
+      '-e', 'POSTGRES_USER=bluman',
+      '-e', 'POSTGRES_PASSWORD=bluman_dev_password',
+      '-e', 'POSTGRES_DB=bluman_e2e',
+      '-p', `${PORTA_DB_E2E}:5432`,
+      'postgres:16-alpine',
+    ]);
+    assicuraContainer('bluman-e2e-mailpit', ['-p', '1025:1025', '-p', '8025:8025', 'axllent/mailpit']);
+    await attendiPostgres();
+  }
   await svuotaMailpit();
 
   console.log('→ Migrazioni Prisma (migrate deploy, mai db push)');
   esegui('npx', ['prisma', 'migrate', 'deploy'], AMBIENTE_DB, { shell: true });
 
-  const conteggioUtenti = spawnSync(
-    'docker',
-    ['exec', 'bluman-e2e-pg', 'psql', '-U', 'bluman', '-d', 'bluman_e2e', '-tAc', 'select count(*) from "user"'],
-    { encoding: 'utf8' },
-  );
-  if (conteggioUtenti.status !== 0) {
-    console.error('❌ Impossibile contare gli utenti sul database E2E.');
-    process.exit(1);
-  }
-  if (Number(conteggioUtenti.stdout.trim()) === 0) {
+  if (contaUtenti() === 0) {
     console.log('→ Database vuoto: seed master (con password E2E note)');
     esegui('npx', ['tsx', 'prisma/seed.ts'], {
       ...AMBIENTE_DB,
