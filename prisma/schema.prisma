@@ -802,6 +802,9 @@ model Documento {
   // documento. I generati lo ereditano dal template; per gli upload manuali lo sceglie
   // l'operatore alla pubblicazione. Cambiabile finché la firma non è apposta.
   livelloFirmaRichiesto String             @default("ses") @map("livello_firma_richiesto")
+  // Il livello del modello da cui il documento nasce (titolare, 28/11/2026): è il minimo, il
+  // livello richiesto si può alzare ma non scendere sotto. «ses» = nessun minimo.
+  livelloFirmaMinimo    String             @default("ses") @map("livello_firma_minimo")
   // Versioning: documentoPadreId punta alla riga v1 quando si carica una v2 corretta.
   documentoPadreId      String?            @map("documento_padre_id")
   documentoPadre        Documento?         @relation("VersioniDocumento", fields: [documentoPadreId], references: [id])

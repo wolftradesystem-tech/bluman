@@ -113,12 +113,27 @@ describe('DocumentEditorPage — il livello di firma segue il modello e il docum
     expect(segnati[0]).toContain('FEA — ');
   });
 
+  // Titolare, 28/11/2026 — il livello del modello è il minimo: si alza, non si abbassa.
+  it('modello FEA → la firma semplice è spenta e la pagina dice perché; FEQ resta scegliibile', async () => {
+    render(
+      <MemoryRouter initialEntries={['/documents?tmplId=tmpl-fea&projId=prg-1']}>
+        <DocumentEditorPage />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(livelloSegnato().join(' ')).toContain('FEA — '));
+    expect((screen.getByRole('button', { name: /SES — Semplice/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: /FEQ — Qualificata/ }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getByRole('note').textContent).toContain('Il modello richiede almeno la firma FEA');
+  });
+
   it('modello senza livello dichiarato → firma semplice, come prima', async () => {
     apri();
     await waitFor(() => expect(document.body.textContent).toContain('Studio Vero Srl'));
     const segnati = livelloSegnato();
     expect(segnati).toHaveLength(1);
     expect(segnati[0]).toContain('SES — ');
+    // Nessun minimo: nessun livello spento e nessuna nota.
+    expect(screen.queryByRole('note')).toBeNull();
   });
 
   it('documento salvato con FEQ, riaperto → resta FEQ', async () => {
