@@ -12,6 +12,9 @@ Un **progetto** è una pratica per un cliente. Dentro ha **moduli** (le prestazi
   dipendenze**, comunicazioni, fatture e scadenze.
 - **Cosa fa l'operatore su una micro-voce**: **consuntiva le ore**, la marca **completata**, la mette
   **in ritardo** (con motivo obbligatorio) o la sblocca; apre i **passaggi**.
+- **Completare senza ore**: se sull'attività non risultano ore segnate, alla spunta (o all'ultimo
+  passaggio, che la chiude) l'app chiede «Non hai segnato ore su questa attività: completare lo
+  stesso?». È una conferma, non un blocco (deciso dal titolare il 28/11/2026).
 - **Cosa si trova aprendo una micro-voce**: quattro schede — **Checklist Passaggi**, **Note & Registro
   Attività**, **Documenti & Workflow** e **💬 Messaggi**. L'ultima non è più in sola lettura: dal
   **2026-10-06** elenca i messaggi scambiati col cliente **che riguardano questa voce**, dice *perché*

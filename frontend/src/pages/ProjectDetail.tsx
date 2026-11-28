@@ -30,6 +30,7 @@ import type { Progetto, ModuloProgetto, MicroVoce, CategoriaModulo, StatoProgett
 import styles from './ProjectDetail.module.css';
 import { useToast } from '../components/ui/ToastProvider';
 import { confirm } from '../components/ui/ConfirmProvider';
+import { confermaCompletamentoSenzaOre } from '../utils/completamentoSenzaOre';
 
 type Tab = 'moduli' | 'grafo' | 'fatturazione' | 'redditivita' | 'storico' | 'comunicazioni' | 'documenti' | 'calendario';
 
@@ -617,8 +618,11 @@ export function ProjectDetail() {
     });
   };
 
-  const handleToggleMicrovoce = (modId: number, mvIdx: number) => {
+  const handleToggleMicrovoce = async (modId: number, mvIdx: number) => {
     if (!project) return;
+    // Completare senza ore segnate: si chiede conferma, non si blocca (titolare, 28/11/2026).
+    const voce = project.mods.find(m => m.id === modId)?.v[mvIdx];
+    if (voce && voce.s !== 'done' && !(await confermaCompletamentoSenzaOre(voce.hA))) return;
     const newMods = project.mods.map(m => {
       if (m.id === modId) {
         const newV = m.v.map((mv, idx) => {

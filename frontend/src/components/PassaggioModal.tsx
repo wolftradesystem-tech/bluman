@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from './ui/ToastProvider';
+import { confermaCompletamentoSenzaOre } from '../utils/completamentoSenzaOre';
 import { confirm } from './ui/ConfirmProvider';
 import type { DocumentTemplate } from '../utils/documentTemplates';
 import { nomeFileLeggibile } from '../utils';
@@ -143,7 +144,10 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     }
   };
 
-  const toggleDone = (id: string) => {
+  const toggleDone = async (id: string) => {
+    // L'ultimo passaggio chiude l'attività: senza ore segnate si chiede conferma (titolare, 28/11/2026).
+    const chiudeAttivita = steps.some(s => s.id === id && s.stato !== 'done') && steps.every(s => s.id === id || s.stato === 'done');
+    if (chiudeAttivita && !(await confermaCompletamentoSenzaOre(voce.hA))) return;
     const nextSteps: Passaggio[] = steps.map(s => s.id === id ? { ...s, stato: (s.stato === 'done' ? 'pending' : 'done') as 'pending' | 'done' } : s);
     setSteps(nextSteps);
     voce.proc = nextSteps;
